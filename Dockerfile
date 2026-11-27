@@ -7,14 +7,15 @@ RUN apt-get update \
   && corepack enable \
   && corepack prepare pnpm@11.7.0 --activate
 
+ENV CI=true
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml tsconfig.base.json nexacloud.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json nexacloud.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 COPY apps/app/package.json ./apps/app/
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
@@ -24,6 +25,7 @@ RUN --mount=type=secret,id=ncenv sh -c 'set -a; [ -f /run/secrets/ncenv ] && . /
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
+ENV HOSTNAME=0.0.0.0
 ENV SERVE_WEB_DIST=true
 
 EXPOSE 3000
