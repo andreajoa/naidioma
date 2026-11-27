@@ -15,6 +15,10 @@ export interface AppConfig {
   stripeWebhookSecret: string;
   stripePrices: Record<string, string>;
   emailFrom: string;
+  emailReplyTo: string;
+  novamailApiKey: string;
+  novamailBaseUrl: string;
+  novamailAudienceId: string;
   resendApiKey: string;
   brevoApiKey: string;
   ollamaBaseUrl: string;
@@ -46,7 +50,7 @@ function resolveSecret(envName: string): string {
 export const config: AppConfig = {
   port: Number(process.env.PORT ?? 3000),
   host: process.env.HOST ?? '0.0.0.0',
-  appPublicUrl: (process.env.APP_PUBLIC_URL ?? 'https://naidioma.com.br').replace(/\/+$/, ''),
+  appPublicUrl: (process.env.APP_PUBLIC_URL ?? 'https://naidioma.nexaclouds.online').replace(/\/+$/, ''),
   serveWebDist: (process.env.SERVE_WEB_DIST ?? 'true').toLowerCase() !== 'false',
   jwtSecret: resolveSecret('JWT_SECRET'),
   adminApiKey: resolveSecret('ADMIN_API_KEY'),
@@ -61,7 +65,13 @@ export const config: AppConfig = {
     STRIPE_PRICE_PRO_MONTHLY: (process.env.STRIPE_PRICE_PRO_MONTHLY ?? '').trim(),
     STRIPE_PRICE_PRO_YEARLY: (process.env.STRIPE_PRICE_PRO_YEARLY ?? '').trim(),
   },
-  emailFrom: (process.env.EMAIL_FROM ?? 'NAidioma <contato@naidioma.com.br>').trim(),
+  emailFrom: (process.env.EMAIL_FROM ?? 'NAidioma <oi@mail.nexaclouds.online>').trim(),
+  emailReplyTo: (process.env.EMAIL_REPLY_TO ?? 'novamail@nexaclouds.online').trim(),
+  novamailApiKey: (process.env.NOVAMAIL_API_KEY ?? '').trim(),
+  novamailBaseUrl: (process.env.NOVAMAIL_BASE_URL ?? 'https://api.novamail.nexaclouds.online')
+    .trim()
+    .replace(/\/+$/, ''),
+  novamailAudienceId: (process.env.NOVAMAIL_AUDIENCE_ID ?? '').trim(),
   resendApiKey: (process.env.RESEND_API_KEY ?? '').trim(),
   brevoApiKey: (process.env.BREVO_API_KEY ?? '').trim(),
   ollamaBaseUrl: (process.env.OLLAMA_BASE_URL ?? '').trim().replace(/\/+$/, ''),
@@ -78,7 +88,7 @@ export const config: AppConfig = {
   iosStoreUrl: (process.env.IOS_STORE_URL ?? '').trim(),
   corsOrigins: (
     process.env.CORS_ORIGINS ??
-    'https://naidioma.com.br,https://www.naidioma.com.br,capacitor://localhost,https://localhost'
+    'https://naidioma.nexaclouds.online,https://naidioma.com.br,https://www.naidioma.com.br,capacitor://localhost,https://localhost'
   )
     .split(',')
     .map((o) => o.trim())

@@ -484,6 +484,8 @@ export const api = {
         geminiConfigured: boolean;
         stripeConfigured: boolean;
         emailConfigured: boolean;
+        emailProvider?: string;
+        novamailAudienceConfigured?: boolean;
         freeBetaMode: boolean;
         billingUiEnabled: boolean;
         dailyFreeAiTurns: number;
@@ -540,6 +542,40 @@ export const api = {
     if (!res.ok) throw new Error('Falha ao baixar mailing CSV.');
     return res.text();
   },
+
+  syncMailingToNovaMail: (adminKey: string) =>
+    request<{ ok: boolean; synced: number; totalUsers: number; error?: string }>(
+      '/api/admin/mailing/sync-novamail',
+      {
+        method: 'POST',
+        adminKey,
+        body: JSON.stringify({}),
+      },
+    ),
+
+  sendAdminEmailCampaign: (
+    adminKey: string,
+    payload: {
+      subject: string;
+      headline: string;
+      bodyText: string;
+      ctaLabel?: string;
+      ctaUrl?: string;
+      testEmail?: string;
+      language?: LanguageCode;
+    },
+  ) =>
+    request<{
+      sentCount: number;
+      failedCount: number;
+      provider: string;
+      broadcastId?: string;
+      error?: string;
+    }>('/api/admin/email-campaign', {
+      method: 'POST',
+      adminKey,
+      body: JSON.stringify(payload),
+    }),
 
   updateAdminFeedback: (adminKey: string, id: string, status: 'new' | 'in_progress' | 'resolved') =>
     request<{ feedback: unknown }>(`/api/admin/feedback/${id}`, {

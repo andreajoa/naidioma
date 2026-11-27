@@ -161,4 +161,37 @@ describe('NAidioma API Integration', () => {
     expect(csvRes.body).toContain(testEmail);
     expect(csvRes.body).toContain('nucleoafetar');
   });
+
+  it('serves complete SEO & GEO assets for Brazil, USA, Canada, Australia, and New Zealand', async () => {
+    const robots = await app.inject({ method: 'GET', url: '/robots.txt' });
+    expect(robots.statusCode).toBe(200);
+    expect(robots.body).toContain('GPTBot');
+    expect(robots.body).toContain('PerplexityBot');
+    expect(robots.body).toContain('ClaudeBot');
+    expect(robots.body).toContain('Sitemap:');
+
+    const sitemap = await app.inject({ method: 'GET', url: '/sitemap.xml' });
+    expect(sitemap.statusCode).toBe(200);
+    expect(sitemap.body).toContain('hreflang="pt-BR"');
+    expect(sitemap.body).toContain('hreflang="en-US"');
+    expect(sitemap.body).toContain('hreflang="en-CA"');
+    expect(sitemap.body).toContain('hreflang="en-AU"');
+    expect(sitemap.body).toContain('hreflang="en-NZ"');
+
+    const llms = await app.inject({ method: 'GET', url: '/llms.txt' });
+    expect(llms.statusCode).toBe(200);
+    expect(llms.body).toContain('100% FREE');
+    expect(llms.body).toContain('New Zealand');
+
+    for (const slug of ['pt-br', 'en-us', 'en-ca', 'en-au', 'en-nz', 'ingles-a1-c2', 'chamada-ao-vivo-ia']) {
+      const page = await app.inject({ method: 'GET', url: `/${slug}/` });
+      expect(page.statusCode).toBe(200);
+      expect(page.body).toContain('application/ld+json');
+      expect(page.body).toContain('FAQPage');
+      expect(page.body).toContain('hreflang="pt-BR"');
+
+      const redir = await app.inject({ method: 'GET', url: `/${slug}` });
+      expect(redir.statusCode).toBe(301);
+    }
+  });
 });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { LanguageCodeSchema, type LanguageCode } from '@naidioma/shared';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../lib/auth.js';
-import { sendWelcomeEmail } from '../services/email.js';
+import { sendWelcomeEmail, syncContactToNovaMail } from '../services/email.js';
 
 export function extractBearerToken(req: FastifyRequest): string | null {
   const header = req.headers.authorization;
@@ -116,11 +116,12 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       },
     });
 
-    // Fire-and-forget professional welcome email when Resend/Brevo is configured
+    // Fire-and-forget welcome email + automatic NovaMail Audience sync (for follow-up/promo campaigns)
     void sendWelcomeEmail({
       email: user.email,
       displayName: user.displayName,
       language: user.activeLanguage as LanguageCode,
+      userId: user.id,
     })
       .then(async (res) => {
         if (res.sent) {
@@ -131,6 +132,14 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         }
       })
       .catch(() => {});
+
+    void syncContactToNovaMail({
+      email: user.email,
+      displayName: user.displayName,
+      language: user.activeLanguage as LanguageCode,
+      marketingOptIn: user.marketingOptIn,
+      leadSource: user.leadSource,
+    }).catch(() => {});
 
     const token = signToken(user);
     return reply.status(201).send({ token, user: sanitizeUser(user) });
@@ -181,6 +190,17 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       where: { id: user.id },
       data: updateData,
     });
+
+    if (typeof parsed.data.marketingOptIn === 'boolean' || parsed.data.activeLanguage) {
+      void syncContactToNovaMail({
+        email: updated.email,
+        displayName: updated.displayName,
+        language: updated.activeLanguage as LanguageCode,
+        marketingOptIn: updated.marketingOptIn,
+        leadSource: updated.leadSource,
+      }).catch(() => {});
+    }
+
     return { user: sanitizeUser(updated) };
   });
 }

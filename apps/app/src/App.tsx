@@ -6,6 +6,7 @@ import {
   ChatCircleDots,
   ChatTeardropText,
   Compass,
+  DownloadSimple,
   Fire,
   Heart,
   Leaf,
@@ -46,6 +47,7 @@ import {
   type UserProfile,
 } from './lib/api';
 import { APP_CLIENT_VERSION, getPlatform, hapticTap, initNativeChrome } from './lib/native';
+import { usePwaInstall } from './lib/pwaInstall';
 import {
   applyCalmMode,
   isCalmModeEnabled,
@@ -80,6 +82,7 @@ export function App() {
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const pwaInstall = usePwaInstall();
 
   useEffect(() => {
     applyCalmMode(calmMode);
@@ -300,6 +303,17 @@ export function App() {
         </div>
 
         <div className="space-y-2.5">
+          {!pwaInstall.isStandalone && (
+            <button
+              type="button"
+              onClick={() => void pwaInstall.triggerInstall()}
+              className="w-full min-h-[46px] px-3 rounded-2xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-xs font-extrabold flex items-center justify-center gap-2 active:translate-y-[1px]"
+            >
+              <DownloadSimple size={17} weight="bold" />
+              Instalar App NAidioma
+            </button>
+          )}
+
           {/* Controles sensoriais rápidos (Autismo & TDAH) */}
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -451,6 +465,19 @@ export function App() {
                 <Heart size={18} weight="fill" className="text-[var(--na-burgundy)]" />
                 <span>∞</span>
               </div>
+
+              {/* Botão persistente de instalar o app sempre visível quando aberto online */}
+              {!pwaInstall.isStandalone && (
+                <button
+                  type="button"
+                  onClick={() => void pwaInstall.triggerInstall()}
+                  className="min-h-[38px] px-2.5 sm:px-3 rounded-xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-[11px] sm:text-xs font-extrabold inline-flex items-center gap-1 active:translate-y-[1px] shrink-0"
+                  title="Instalar o aplicativo NAidioma no seu aparelho"
+                >
+                  <DownloadSimple size={15} weight="bold" />
+                  <span>Instalar</span>
+                </button>
+              )}
 
               {/* Botões rápidos de Som e Modo Calmo no celular */}
               <button

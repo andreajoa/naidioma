@@ -6,6 +6,7 @@ import {
   CaretDown,
   CaretLeft,
   CaretRight,
+  DownloadSimple,
   EnvelopeSimple,
   LockSimple,
   User,
@@ -14,6 +15,7 @@ import {
 import { LANGUAGES, type LanguageCode } from '@naidioma/shared';
 import { api, type UserProfile } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
+import { usePwaInstall } from '../lib/pwaInstall';
 import { playCorrectSound, playGentleRetrySound, playTapSound } from '../lib/sound';
 import { speakText } from '../lib/speech';
 import { FlagSvg, HeroAutismScene } from './HeroAutismScene';
@@ -58,6 +60,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ribbonRef = useRef<HTMLDivElement>(null);
+  const pwaInstall = usePwaInstall();
 
   function scrollRibbon(dir: -1 | 1) {
     playTapSound();
@@ -127,9 +130,21 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             </span>
           </div>
 
-          <div className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#9A8E83] select-none">
-            <span>IDIOMA DO SITE: PORTUGUÊS</span>
-            <CaretDown size={13} weight="bold" />
+          <div className="flex items-center gap-2.5">
+            {!pwaInstall.isStandalone && (
+              <button
+                type="button"
+                onClick={() => void pwaInstall.triggerInstall()}
+                className="min-h-[38px] px-3 rounded-xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-[11px] sm:text-xs font-extrabold inline-flex items-center gap-1.5 active:translate-y-[1px]"
+              >
+                <DownloadSimple size={15} weight="bold" />
+                Instalar App
+              </button>
+            )}
+            <div className="hidden sm:inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#9A8E83] select-none">
+              <span>IDIOMA DO SITE: PORTUGUÊS</span>
+              <CaretDown size={13} weight="bold" />
+            </div>
           </div>
         </header>
 
@@ -148,13 +163,23 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 240, damping: 24, delay: 0.06 }}
-            className="w-full max-w-[440px] lg:w-1/2 flex flex-col items-center text-center space-y-7"
+            className="w-full max-w-[460px] lg:w-1/2 flex flex-col items-center text-center space-y-5"
           >
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-[#6B4600]">
+              ✨ 100% GRÁTIS ATÉ A FLUÊNCIA · 8 IDIOMAS
+            </div>
+
             <h1 className="font-display text-[28px] sm:text-[34px] leading-[1.2] text-[#453D42]">
-              O jeito mais divertido de aprender idiomas, letras e muito mais!
+              Seu ritmo, sua voz, sua fluência — 100% grátis do primeiro passo ao C2!
             </h1>
 
-            <div className="w-full max-w-[330px] space-y-3">
+            <p className="text-sm sm:text-[15px] font-semibold text-[#6C646B] leading-relaxed max-w-[400px]">
+              Estude Inglês completo (A1 ao C2), Coreano, Japonês e mais 5 idiomas no idioma que
+              quiser, com provas oficiais e Chamada ao Vivo com Tutor IA 24h — sem pagar nada e sem
+              perder vidas.
+            </p>
+
+            <div className="w-full max-w-[330px] space-y-3 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -164,7 +189,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 }}
                 className="duo-btn-wine w-full text-[15px] uppercase tracking-wider"
               >
-                COMECE AGORA
+                COMEÇAR 100% GRÁTIS
               </button>
 
               <button
@@ -226,6 +251,35 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <CaretRight size={18} weight="bold" />
             </button>
           </div>
+
+          <nav
+            aria-label="Guias regionais e currículo NAidioma"
+            className="border-t border-[#F4ECE1] bg-[#FFFDF9] px-4 py-2.5"
+          >
+            <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] font-bold text-[#7F756E]">
+              <a href="/pt-br/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                Brasil (PT-BR)
+              </a>
+              <a href="/ingles-a1-c2/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                Inglês A1 ao C2
+              </a>
+              <a href="/chamada-ao-vivo-ia/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                Chamada ao Vivo IA
+              </a>
+              <a href="/en-us/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                USA (EN)
+              </a>
+              <a href="/en-ca/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                Canada (EN)
+              </a>
+              <a href="/en-au/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                Australia (EN)
+              </a>
+              <a href="/en-nz/" className="hover:text-[var(--na-burgundy)] underline-offset-2 hover:underline">
+                New Zealand (EN)
+              </a>
+            </div>
+          </nav>
         </footer>
       </div>
     );
@@ -508,6 +562,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   </div>
                 </div>
 
+                <div className="p-3 rounded-2xl bg-[var(--na-teal-soft)] border-2 border-[var(--na-teal)]/40 text-xs font-extrabold text-[var(--na-teal-dark)] leading-relaxed">
+                  ✨ 100% gratuito até a fluência: estude do A1 ao C2 no idioma que quiser, sem
+                  pagar nada e sem perder vidas.
+                </div>
+
                 <label className="flex items-start gap-2.5 text-xs text-[var(--na-muted)] leading-relaxed cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -516,8 +575,10 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                     className="mt-0.5 w-4 h-4 accent-[var(--na-burgundy)] shrink-0"
                   />
                   <span>
-                    Aceito receber novidades e dicas do <strong className="text-[var(--na-ink)]">NAidioma</strong>{' '}
-                    e do <strong className="text-[var(--na-ink)]">Núcleo Afetar</strong> por e-mail (LGPD).
+                    Aceito receber e-mail de boas-vindas, dicas de estudo, novidades e comunicados
+                    promocionais do <strong className="text-[var(--na-ink)]">NAidioma</strong> e do{' '}
+                    <strong className="text-[var(--na-ink)]">Núcleo Afetar</strong> (LGPD — pode
+                    sair com 1 clique quando quiser).
                   </span>
                 </label>
               </>

@@ -8,6 +8,11 @@ import {
 import { config } from '../lib/config.js';
 import { prisma } from '../lib/prisma.js';
 import { pingOllamaEndpoint } from '../services/ai-gateway.js';
+import {
+  bulkSyncContactsToNovaMail,
+  getActiveEmailProvider,
+  sendPromotionalCampaign,
+} from '../services/email.js';
 import { getRuntimeSettings, updateRuntimeSettings } from '../services/runtime-config.js';
 import { requireUser } from './auth.js';
 
@@ -137,7 +142,9 @@ export async function registerFeedbackAndAdminRoutes(app: FastifyInstance) {
         openaiModel: runtime.openaiModel,
         geminiConfigured: Boolean(config.geminiApiKey),
         stripeConfigured: Boolean(config.stripeSecretKey),
-        emailConfigured: Boolean(config.resendApiKey || config.brevoApiKey),
+        emailConfigured: Boolean(config.novamailApiKey || config.resendApiKey || config.brevoApiKey),
+        emailProvider: getActiveEmailProvider(),
+        novamailAudienceConfigured: Boolean(config.novamailApiKey && config.novamailAudienceId),
         freeBetaMode: runtime.freeBetaMode,
         billingUiEnabled: runtime.billingUiEnabled,
         dailyFreeAiTurns: runtime.dailyFreeAiTurns,
@@ -296,5 +303,69 @@ export async function registerFeedbackAndAdminRoutes(app: FastifyInstance) {
       return reply.status(403).send({ error: 'Acesso restrito.' });
     }
     return pingOllamaEndpoint();
+  });
+
+  // Bulk-sync all NAidioma users into the configured NovaMail Audience (for funnels & broadcasts)
+  app.post('/api/admin/mailing/sync-novamail', async (req, reply) => {
+    if (!(await isAuthorizedAdmin(req))) {
+      return reply.status(403).send({ error: 'Acesso restrito.' });
+    }
+    const users = await prisma.user.findMany({
+      select: { email: true, displayName: true, marketingOptIn: true },
+    });
+    const res = await bulkSyncContactsToNovaMail(users);
+    if (res.error) {
+      return reply.status(400).send({ synced: res.synced, error: res.error });
+    }
+    return { ok: true, synced: res.synced, totalUsers: users.length };
+  });
+
+  // Send a test or live promotional email campaign via NovaMail to opted-in NAidioma users
+  app.post('/api/admin/email-campaign', async (req, reply) => {
+    if (!(await isAuthorizedAdmin(req))) {
+      return reply.status(403).send({ error: 'Acesso restrito.' });
+    }
+    const schema = z.object({
+      subject: z.string().trim().min(3).max(180),
+      headline: z.string().trim().min(3).max(180),
+      bodyText: z.string().trim().min(10).max(8000),
+      ctaLabel: z.string().trim().max(80).optional(),
+      ctaUrl: z.string().trim().url().max(300).optional(),
+      testEmail: z.string().trim().email().optional(),
+      language: LanguageCodeSchema.optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Preencha assunto, título e mensagem válidos.' });
+    }
+
+    const where: Record<string, unknown> = { marketingOptIn: true };
+    if (parsed.data.language) where.activeLanguage = parsed.data.language;
+
+    const recipients = parsed.data.testEmail
+      ? []
+      : await prisma.user.findMany({
+          where,
+          select: { email: true, displayName: true },
+        });
+
+    if (!parsed.data.testEmail && recipients.length === 0) {
+      return reply.status(400).send({ error: 'Nenhum contato com opt-in encontrado para esse filtro.' });
+    }
+
+    const result = await sendPromotionalCampaign({
+      subject: parsed.data.subject,
+      headline: parsed.data.headline,
+      bodyText: parsed.data.bodyText,
+      ctaLabel: parsed.data.ctaLabel,
+      ctaUrl: parsed.data.ctaUrl,
+      testEmail: parsed.data.testEmail,
+      recipients,
+    });
+
+    if (result.error && result.sentCount === 0) {
+      return reply.status(502).send(result);
+    }
+    return result;
   });
 }

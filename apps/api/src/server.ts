@@ -14,7 +14,9 @@ import { registerBillingRoutes } from './routes/billing.js';
 import { registerCourseRoutes } from './routes/courses.js';
 import { registerFeedbackAndAdminRoutes } from './routes/feedback-admin.js';
 import { registerPushRoutes } from './routes/push.js';
+import { registerSeoRoutes } from './routes/seo.js';
 import { getAiCapabilities } from './services/ai-gateway.js';
+import { getActiveEmailProvider } from './services/email.js';
 import {
   getCloudSyncStatus,
   pushDatabaseToCloudflare,
@@ -96,6 +98,8 @@ export async function buildServer() {
       aiProvider: aiCaps.primaryProvider,
       aiModel: aiCaps.primaryModel,
       sttConfigured: aiCaps.sttAvailable,
+      emailProvider: getActiveEmailProvider(),
+      novamailAudienceConfigured: Boolean(config.novamailApiKey && config.novamailAudienceId),
       cloudSync: getCloudSyncStatus(),
       timestamp: new Date().toISOString(),
     };
@@ -136,6 +140,7 @@ export async function buildServer() {
   await registerBillingRoutes(app);
   await registerFeedbackAndAdminRoutes(app);
   await registerPushRoutes(app);
+  await registerSeoRoutes(app);
 
   // Unified NexaCloud production hosting: serve compiled Web App / PWA on same port
   const webDistDir = path.resolve(__dirname, '../../app/dist');
@@ -145,6 +150,9 @@ export async function buildServer() {
       prefix: '/',
       wildcard: false,
       setHeaders: (res, filePath) => {
+        if (filePath.endsWith('manifest.webmanifest')) {
+          res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+        }
         if (
           filePath.endsWith('sw.js') ||
           filePath.endsWith('push-sw.js') ||
@@ -153,6 +161,7 @@ export async function buildServer() {
           filePath.endsWith('index.html')
         ) {
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('CDN-Cache-Control', 'no-store');
         }
       },
     });
@@ -161,6 +170,8 @@ export async function buildServer() {
       if (req.url.startsWith('/api/')) {
         return reply.status(404).send({ error: 'Endpoint não encontrado.' });
       }
+      reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+      reply.header('CDN-Cache-Control', 'no-store');
       return reply.sendFile('index.html');
     });
   }

@@ -39,6 +39,21 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
   const [releaseNotesPt, setReleaseNotesPt] = useState('');
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
+  // NovaMail promotional campaign state
+  const [campSubject, setCampSubject] = useState(
+    'Seu ritmo, sua voz, sua fluência — novidade no NAidioma 🧩',
+  );
+  const [campHeadline, setCampHeadline] = useState(
+    'Pratique inglês ao vivo com Tutor IA 24h (100% grátis!)',
+  );
+  const [campBody, setCampBody] = useState(
+    'No NAidioma você pode estudar do A1 ao C2 em qualquer um dos 8 idiomas sem pagar nada.\n\nExperimente hoje a Chamada ao Vivo por voz com a Maya, o Oliver ou o seu Bichinho e receba seu Boletim de Erros palavra por palavra!',
+  );
+  const [campCtaLabel, setCampCtaLabel] = useState('Abrir NAidioma grátis agora');
+  const [campTestEmail, setCampTestEmail] = useState('');
+  const [campBusy, setCampBusy] = useState(false);
+  const [campStatus, setCampStatus] = useState<string | null>(null);
+
   async function loadAdmin(keyToUse: string) {
     setLoading(true);
     setError(null);
@@ -107,6 +122,42 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
   async function handleStatusFeedback(id: string, status: 'new' | 'in_progress' | 'resolved') {
     await api.updateAdminFeedback(adminKey, id, status);
     await loadAdmin(adminKey);
+  }
+
+  async function handleSyncNovaMail() {
+    setCampBusy(true);
+    setCampStatus(null);
+    try {
+      const res = await api.syncMailingToNovaMail(adminKey);
+      setCampStatus(`✅ ${res.synced} de ${res.totalUsers} contatos sincronizados com o NovaMail!`);
+    } catch (err) {
+      setCampStatus(`⚠️ ${err instanceof Error ? err.message : 'Falha ao sincronizar com NovaMail.'}`);
+    } finally {
+      setCampBusy(false);
+    }
+  }
+
+  async function handleSendCampaign(isTest: boolean) {
+    setCampBusy(true);
+    setCampStatus(null);
+    try {
+      const res = await api.sendAdminEmailCampaign(adminKey, {
+        subject: campSubject,
+        headline: campHeadline,
+        bodyText: campBody,
+        ctaLabel: campCtaLabel,
+        testEmail: isTest ? campTestEmail.trim() : undefined,
+      });
+      setCampStatus(
+        isTest
+          ? `✅ E-mail de teste enviado via ${res.provider} para ${campTestEmail.trim()}!`
+          : `✅ Campanha enviada via ${res.provider} para ${res.sentCount} contato(s)!${res.broadcastId ? ` (Broadcast ${res.broadcastId})` : ''}`,
+      );
+    } catch (err) {
+      setCampStatus(`⚠️ ${err instanceof Error ? err.message : 'Falha ao enviar campanha.'}`);
+    } finally {
+      setCampBusy(false);
+    }
   }
 
   return (
@@ -215,24 +266,138 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
               </button>
             </div>
 
-            {/* Tab 1: Mailing & CSV Export */}
+            {/* Tab 1: Mailing, NovaMail Campaigns & CSV Export */}
             {tab === 'mailing' && (
-              <div className="surface-card p-5 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-display text-2xl">Base de E-mail Marketing</h3>
-                    <p className="text-xs text-[var(--na-muted)]">
-                      Pronta para importar na Brevo, Resend ou campanhas do Núcleo Afetar.
-                    </p>
+              <div className="space-y-5">
+                <div className="surface-card p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-display text-2xl">Campanhas &amp; Propaganda via NovaMail</h3>
+                      <p className="text-xs text-[var(--na-muted)]">
+                        Provedor ativo:{' '}
+                        <strong className="uppercase text-[var(--na-teal)]">
+                          {overview.runtime.emailProvider ?? (overview.runtime.emailConfigured ? 'ativo' : 'não configurado')}
+                        </strong>{' '}
+                        · Boas-vindas automático no cadastro + funil e disparos promocionais.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={campBusy}
+                      onClick={() => void handleSyncNovaMail()}
+                      className="btn-tactile-secondary px-4 text-xs inline-flex items-center gap-2"
+                    >
+                      <CloudCheck size={16} weight="bold" /> Sincronizar Contatos no NovaMail
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleExportCsv()}
-                    className="btn-tactile-primary px-4 text-xs inline-flex items-center gap-2"
-                  >
-                    <DownloadSimple size={16} weight="bold" /> Baixar Mailing CSV
-                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-[var(--na-muted)] mb-1">
+                        Assunto do e-mail
+                      </label>
+                      <input
+                        type="text"
+                        value={campSubject}
+                        onChange={(e) => setCampSubject(e.target.value)}
+                        className="w-full min-h-[42px] px-3 rounded-xl border border-[var(--na-border)] bg-[var(--na-cream)] text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-[var(--na-muted)] mb-1">
+                        Título interno (Headline)
+                      </label>
+                      <input
+                        type="text"
+                        value={campHeadline}
+                        onChange={(e) => setCampHeadline(e.target.value)}
+                        className="w-full min-h-[42px] px-3 rounded-xl border border-[var(--na-border)] bg-[var(--na-cream)] text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-[var(--na-muted)] mb-1">
+                      Mensagem promocional / novidade
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={campBody}
+                      onChange={(e) => setCampBody(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-[var(--na-border)] bg-[var(--na-cream)] text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-[var(--na-muted)] mb-1">
+                        Texto do botão (CTA)
+                      </label>
+                      <input
+                        type="text"
+                        value={campCtaLabel}
+                        onChange={(e) => setCampCtaLabel(e.target.value)}
+                        className="w-full min-h-[42px] px-3 rounded-xl border border-[var(--na-border)] bg-[var(--na-cream)] text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-[var(--na-muted)] mb-1">
+                        E-mail para envio de teste (opcional)
+                      </label>
+                      <input
+                        type="email"
+                        value={campTestEmail}
+                        onChange={(e) => setCampTestEmail(e.target.value)}
+                        placeholder="seu@email.com"
+                        className="w-full min-h-[42px] px-3 rounded-xl border border-[var(--na-border)] bg-[var(--na-cream)] text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {campStatus && (
+                    <div className="text-xs font-bold p-3 rounded-xl bg-[var(--na-cream)] border border-[var(--na-border)]">
+                      {campStatus}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      disabled={campBusy || !campTestEmail.trim()}
+                      onClick={() => void handleSendCampaign(true)}
+                      className="btn-tactile-secondary px-4 text-xs"
+                    >
+                      Enviar E-mail de Teste
+                    </button>
+                    <button
+                      type="button"
+                      disabled={campBusy}
+                      onClick={() => void handleSendCampaign(false)}
+                      className="btn-tactile-primary px-5 text-xs"
+                    >
+                      {campBusy
+                        ? 'Enviando...'
+                        : `Disparar Campanha para ${overview.metrics.optInUsers} Opt-In`}
+                    </button>
+                  </div>
                 </div>
+
+                <div className="surface-card p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-display text-2xl">Base de E-mail Marketing</h3>
+                      <p className="text-xs text-[var(--na-muted)]">
+                        Sincronizada automaticamente com o NovaMail e pronta para exportar em CSV.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleExportCsv()}
+                      className="btn-tactile-primary px-4 text-xs inline-flex items-center gap-2"
+                    >
+                      <DownloadSimple size={16} weight="bold" /> Baixar Mailing CSV
+                    </button>
+                  </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
@@ -259,6 +424,7 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
                       ))}
                     </tbody>
                   </table>
+                </div>
                 </div>
               </div>
             )}

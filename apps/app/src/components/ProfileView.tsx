@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Crown,
+  DownloadSimple,
   EnvelopeSimple,
   Fire,
   GearSix,
@@ -14,6 +15,7 @@ import {
 import { LANGUAGES } from '@naidioma/shared';
 import { api, type BillingStatusResponse, type UserProfile } from '../lib/api';
 import { APP_CLIENT_VERSION, getPlatform, hapticSuccess, hapticTap } from '../lib/native';
+import { usePwaInstall } from '../lib/pwaInstall';
 import {
   applyCalmMode,
   isCalmModeEnabled,
@@ -50,6 +52,7 @@ export function ProfileView({
   const [calmMode, setCalmMode] = useState(() => isCalmModeEnabled());
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const pwaInstall = usePwaInstall();
 
   async function handleSavePrefs() {
     setSaving(true);
@@ -126,6 +129,31 @@ export function ProfileView({
 
       {/* Lembretes Diários Motivacionais na Tela do Celular */}
       <ReminderCard petName={petName} />
+
+      {/* Instalar App no Celular / Computador (sempre visível quando aberto no navegador) */}
+      {!pwaInstall.isStandalone && (
+        <section className="rounded-[22px] bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] border-b-[5px] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-[#7a5200]">
+              Aplicativo Oficial · Modo Offline
+            </div>
+            <h2 className="font-display text-xl text-[#4a3000]">
+              Instalar o NAidioma no seu aparelho 🧩
+            </h2>
+            <p className="text-xs font-semibold text-[#6e4a00] leading-relaxed">
+              Tenha o ícone na sua lista de apps instalados (Android, iPhone ou computador) e estude mesmo sem internet.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void pwaInstall.triggerInstall()}
+            className="min-h-[48px] px-5 rounded-2xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-xs sm:text-sm font-extrabold inline-flex items-center justify-center gap-2 shrink-0 active:translate-y-[1px]"
+          >
+            <DownloadSimple size={18} weight="bold" />
+            Instalar App Agora
+          </button>
+        </section>
+      )}
 
       {/* Conforto Sensorial (Autismo & TDAH) */}
       <section className="duo-card p-5 space-y-3">
