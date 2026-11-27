@@ -26,6 +26,13 @@ import { InstallAppBanner } from './components/InstallAppBanner';
 import { LearnView } from './components/LearnView';
 import { LessonPlayer } from './components/LessonPlayer';
 import { LANGUAGE_FLAGS, PuzzleMascot } from './components/Mascots';
+import {
+  PetPickerModal,
+  PetSprite,
+  loadPetProfile,
+  savePetProfile,
+  type PetProfile,
+} from './components/PetBuddy';
 import { ProfileView } from './components/ProfileView';
 import { ReviewView } from './components/ReviewView';
 import {
@@ -58,6 +65,9 @@ export function App() {
   const [courseDetail, setCourseDetail] = useState<CourseDetailResponse | null>(null);
   const [loadingCourse, setLoadingCourse] = useState(false);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [pet, setPet] = useState<PetProfile>(() => loadPetProfile());
+  const [petPickerOpen, setPetPickerOpen] = useState(false);
+  const [justCompletedLessonId, setJustCompletedLessonId] = useState<string | null>(null);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
@@ -171,6 +181,18 @@ export function App() {
     applyCalmMode(next);
     playTapSound();
   }
+
+  function handleSavePet(next: PetProfile) {
+    setPet(savePetProfile(next));
+  }
+
+  const handlePetHappinessChange = useCallback((delta: number) => {
+    setPet((prev) => savePetProfile({ ...prev, happiness: prev.happiness + delta }));
+  }, []);
+
+  const handleClearJustCompleted = useCallback(() => {
+    setJustCompletedLessonId(null);
+  }, []);
 
   // SPLASH DE ABERTURA COM O MASCOTE QUEBRA-CABEÇA PUZ (No lugar da coruja!)
   if (booting) {
@@ -386,11 +408,11 @@ export function App() {
               )}
             </div>
 
-            {/* Métricas HUD vivas (Ofensiva 🔥 · Peças 🧩 · Coração ∞) */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            {/* Métricas HUD NAidioma (Ritmo de Foco ⚡ · Peças 🧩 · Meu Bichinho · Infinito ∞) */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <div
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--na-flame-soft)] text-[var(--na-flame)] font-extrabold text-sm"
-                title="Dias seguidos estudando"
+                title="Ritmo de Foco — dias seguidos praticando"
               >
                 <Fire size={19} weight="fill" />
                 <span>{user.streakDays}</span>
@@ -398,17 +420,35 @@ export function App() {
 
               <div
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--na-gold-soft)] text-[#996600] font-extrabold text-sm"
-                title="Seus pontos / peças"
+                title="Suas Peças do Quebra-Cabeça"
               >
                 <PuzzlePiece size={19} weight="fill" className="text-[var(--na-gold-dark)]" />
                 <span>{user.xpTotal}</span>
               </div>
 
-              <div
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--na-rose-soft)] text-[var(--na-burgundy)] font-extrabold text-sm"
-                title="Energia infinita — pode errar e tentar sem medo!"
+              <button
+                type="button"
+                onClick={() => {
+                  void hapticTap();
+                  playTapSound();
+                  setPetPickerOpen(true);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-xl bg-[var(--na-rose-soft)] border-2 border-[var(--na-burgundy)]/30 text-[var(--na-burgundy)] font-extrabold text-xs"
+                title={`Seu bichinho: ${pet.name} (${pet.happiness}% feliz)`}
               >
-                <Heart size={18} weight="fill" />
+                <PetSprite
+                  species={pet.species}
+                  mood={pet.happiness < 45 ? 'sad' : 'happy'}
+                  size={26}
+                />
+                <span className="hidden sm:inline">{pet.name}</span>
+              </button>
+
+              <div
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--na-teal-soft)] text-[var(--na-teal-dark)] font-extrabold text-sm"
+                title="Infinito Neurodiverso — tente no seu ritmo, sem perder nada!"
+              >
+                <Heart size={18} weight="fill" className="text-[var(--na-burgundy)]" />
                 <span>∞</span>
               </div>
 
@@ -460,8 +500,11 @@ export function App() {
             <LessonPlayer
               language={user.activeLanguage}
               lesson={activeLesson}
+              pet={pet}
+              onPetHappinessChange={handlePetHappinessChange}
               onExit={() => setActiveLesson(null)}
               onCompleted={(summary) => {
+                setJustCompletedLessonId(summary.lessonId);
                 setUser((prev) =>
                   prev
                     ? { ...prev, xpTotal: summary.xpTotal, streakDays: summary.streakDays }
@@ -475,6 +518,10 @@ export function App() {
               {tab === 'learn' && (
                 <LearnView
                   user={user}
+                  pet={pet}
+                  justCompletedLessonId={justCompletedLessonId}
+                  onClearJustCompleted={handleClearJustCompleted}
+                  onOpenPetPicker={() => setPetPickerOpen(true)}
                   courseDetail={courseDetail}
                   loading={loadingCourse}
                   onSelectLanguage={(lang) => void handleSelectLanguage(lang)}
@@ -570,6 +617,14 @@ export function App() {
 
       {billingModalOpen && billing?.billingVisible && (
         <BillingModal billing={billing} onClose={() => setBillingModalOpen(false)} />
+      )}
+
+      {petPickerOpen && (
+        <PetPickerModal
+          pet={pet}
+          onSave={handleSavePet}
+          onClose={() => setPetPickerOpen(false)}
+        />
       )}
     </div>
   );

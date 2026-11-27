@@ -369,6 +369,78 @@
   }
 }
 
+/* Animação real das perninhas andando + corpinho balançando + lagriminha triste */
+@keyframes na-leg-left {
+  0%,
+  100% {
+    transform: translate(0px, 0px) rotate(-18deg);
+  }
+  50% {
+    transform: translate(5px, -6px) rotate(24deg);
+  }
+}
+
+@keyframes na-leg-right {
+  0%,
+  100% {
+    transform: translate(5px, -6px) rotate(24deg);
+  }
+  50% {
+    transform: translate(0px, 0px) rotate(-18deg);
+  }
+}
+
+@keyframes na-walk-bob {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-4deg);
+  }
+  25% {
+    transform: translateY(-7px) rotate(3deg);
+  }
+  50% {
+    transform: translateY(0px) rotate(4deg);
+  }
+  75% {
+    transform: translateY(-7px) rotate(-3deg);
+  }
+}
+
+@keyframes na-sad-shiver {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(3px) rotate(2deg);
+  }
+}
+
+@keyframes na-tear-drop {
+  0% {
+    transform: translateY(0px) scale(0.7);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(14px) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes na-dust-puff {
+  0% {
+    transform: translateX(0px) scale(0.5);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(-18px) translateY(-6px) scale(1.25);
+    opacity: 0;
+  }
+}
+
 .animate-na-float {
   animation: na-float 3s ease-in-out infinite;
 }
@@ -395,6 +467,28 @@
   animation: na-sparkle-pop 2.1s ease-in-out infinite;
   transform-box: fill-box;
   transform-origin: center;
+}
+.animate-na-leg-l {
+  animation: na-leg-left 0.34s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+.animate-na-leg-r {
+  animation: na-leg-right 0.34s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+.animate-na-walk-bob {
+  animation: na-walk-bob 0.34s ease-in-out infinite;
+}
+.animate-na-sad {
+  animation: na-sad-shiver 1.8s ease-in-out infinite;
+}
+.animate-na-tear {
+  animation: na-tear-drop 1.3s ease-in infinite;
+}
+.animate-na-dust {
+  animation: na-dust-puff 0.5s ease-out infinite;
 }
 
 /* Modo Calmo (Autismo & TDAH) + prefers-reduced-motion */

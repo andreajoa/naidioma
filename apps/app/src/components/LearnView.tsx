@@ -5,6 +5,7 @@ import {
   Check,
   Fire,
   Gift,
+  Heart,
   Microphone,
   Play,
   SpeakerHigh,
@@ -15,7 +16,12 @@ import {
 import type { LanguageCode, Lesson, Unit } from '@naidioma/shared';
 import type { CourseDetailResponse, UserProfile } from '../lib/api';
 import { hapticSuccess, hapticTap } from '../lib/native';
-import { playChestOpenSound, playTapSound } from '../lib/sound';
+import {
+  playChestOpenSound,
+  playFootstepsSound,
+  playPetHappySound,
+  playTapSound,
+} from '../lib/sound';
 import { speakText } from '../lib/speech';
 import {
   ConfettiBurst,
@@ -24,9 +30,14 @@ import {
   PuzzleMascot,
   type CastId,
 } from './Mascots';
+import { PetSprite, type PetProfile } from './PetBuddy';
 
 interface LearnViewProps {
   user: UserProfile;
+  pet: PetProfile;
+  justCompletedLessonId: string | null;
+  onClearJustCompleted: () => void;
+  onOpenPetPicker: () => void;
   courseDetail: CourseDetailResponse | null;
   loading: boolean;
   onSelectLanguage: (lang: LanguageCode) => void;
@@ -75,7 +86,6 @@ const UNIT_THEMES: UnitTheme[] = [
   },
 ];
 
-// Curva senoidal idêntica à trilha sinuosa em S do Duolingo!
 const WINDING_OFFSETS = [0, -56, -74, -40, 14, 62, 74, 34];
 
 const CHESTS_STORAGE_KEY = 'naidioma_opened_chests_v1';
@@ -94,6 +104,10 @@ function readOpenedChests(): Record<string, boolean> {
 
 export function LearnView({
   user,
+  pet,
+  justCompletedLessonId,
+  onClearJustCompleted,
+  onOpenPetPicker,
   courseDetail,
   loading,
   onStartLesson,
@@ -109,11 +123,37 @@ export function LearnView({
     readOpenedChests(),
   );
   const [chestCelebration, setChestCelebration] = useState<string | null>(null);
+  const [petWalkingOnPath, setPetWalkingOnPath] = useState(false);
+  const [petArrivedCheer, setPetArrivedCheer] = useState(false);
 
   useEffect(() => {
     setSelectedLessonId(null);
     setGuideUnit(null);
   }, [user.activeLanguage]);
+
+  // Quando volta de uma lição concluída, mostra o bichinho ANDANDO na trilha até a próxima atividade!
+  useEffect(() => {
+    if (!justCompletedLessonId) return undefined;
+    setPetWalkingOnPath(true);
+    setPetArrivedCheer(false);
+    playFootstepsSound(6);
+
+    const arriveTimer = setTimeout(() => {
+      setPetWalkingOnPath(false);
+      setPetArrivedCheer(true);
+      playPetHappySound();
+      onClearJustCompleted();
+    }, 1550);
+
+    const clearCheerTimer = setTimeout(() => {
+      setPetArrivedCheer(false);
+    }, 4000);
+
+    return () => {
+      clearTimeout(arriveTimer);
+      clearTimeout(clearCheerTimer);
+    };
+  }, [justCompletedLessonId, onClearJustCompleted]);
 
   const allLessons: Lesson[] = course?.units.flatMap((u) => u.lessons) ?? [];
   const nextLesson =
@@ -121,7 +161,10 @@ export function LearnView({
 
   const dailyGoalXp = Math.max(30, user.dailyGoalMinutes * 5);
   const completedCount = Object.keys(completedMap).length;
-  const dailyPct = Math.min(100, Math.round(((completedCount * 40 + (user.xpTotal % dailyGoalXp)) / dailyGoalXp) * 100));
+  const dailyPct = Math.min(
+    100,
+    Math.round(((completedCount * 40 + (user.xpTotal % dailyGoalXp)) / dailyGoalXp) * 100),
+  );
 
   function handleOpenChest(chestId: string) {
     void hapticSuccess();
@@ -140,21 +183,73 @@ export function LearnView({
   if (loading || !course) {
     return (
       <div className="max-w-xl mx-auto py-10 flex flex-col items-center gap-4">
-        <PuzzleMascot mood="wave" size={110} />
+        <PetSprite species={pet.species} mood="walking" size={110} />
         <div className="text-sm font-extrabold text-[var(--na-burgundy)]">
-          Montando sua trilha de {LANGUAGE_FLAGS[user.activeLanguage].shortName}...
+          {pet.name} está preparando sua trilha de {LANGUAGE_FLAGS[user.activeLanguage].shortName}...
         </div>
       </div>
     );
   }
 
   const flag = LANGUAGE_FLAGS[user.activeLanguage];
+  const petPathMood = petWalkingOnPath
+    ? 'walking'
+    : petArrivedCheer
+      ? 'celebrate'
+      : pet.happiness < 45
+        ? 'sad'
+        : 'happy';
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-8 items-start pb-12">
-      {/* COLUNA CENTRAL: A TRILHA SINUOSA ESTILO DUOLINGO */}
-      <div className="flex-1 w-full max-w-[560px] mx-auto space-y-10">
-        {/* Cardzinho amigável de boas-vindas para crianças (Coreano/Idiomas com letras!) */}
+      {/* COLUNA CENTRAL: TRILHA SINUOSA + BICHINHO CAMINHANDO ATÉ A PRÓXIMA ATIVIDADE */}
+      <div className="flex-1 w-full max-w-[560px] mx-auto space-y-8">
+        {/* BANNER INTERATIVO DO BICHINHO NO TOPO DA TRILHA (Mostra andando quando conclui lição!) */}
+        <button
+          type="button"
+          onClick={() => {
+            void hapticTap();
+            playTapSound();
+            onOpenPetPicker();
+          }}
+          className="w-full p-3.5 rounded-3xl bg-white border-2 border-[var(--na-border)] border-b-[5px] flex items-center justify-between gap-3 text-left overflow-hidden relative"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0">
+              <PetSprite species={pet.species} mood={petPathMood} size={66} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-extrabold text-sm text-[var(--na-ink)]">{pet.name}</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                    pet.happiness < 45
+                      ? 'bg-[var(--na-error-soft)] text-[var(--na-error)]'
+                      : 'bg-[var(--na-success-soft)] text-[var(--na-success-dark)]'
+                  }`}
+                >
+                  {petWalkingOnPath
+                    ? '🐾 Andando...'
+                    : pet.happiness < 45
+                      ? `🥺 Tristinho (${pet.happiness}%)`
+                      : `💖 Feliz (${pet.happiness}%)`}
+                </span>
+              </div>
+              <div className="text-xs font-semibold text-[var(--na-muted)] truncate mt-0.5">
+                {petWalkingOnPath
+                  ? `Caminhando até "${nextLesson?.titlePt ?? 'a próxima atividade'}"!`
+                  : petArrivedCheer
+                    ? `Chegamos! Vamos jogar "${nextLesson?.titlePt ?? 'a próxima'}"? 🎉`
+                    : 'Toque para fazer carinho ou trocar de bichinho'}
+              </div>
+            </div>
+          </div>
+          <span className="px-3 py-1.5 rounded-xl bg-[var(--na-rose-soft)] text-[var(--na-burgundy)] text-xs font-extrabold shrink-0">
+            Cuidar
+          </span>
+        </button>
+
+        {/* Cardzinho de Letras / Hangul para Coreano, Japonês e Chinês */}
         {course.meta.script.hasNativeScript && (
           <button
             type="button"
@@ -192,7 +287,6 @@ export function LearnView({
           const doneInUnit = unit.lessons.filter((l) => Boolean(completedMap[l.id])).length;
           const unitCompleted = doneInUnit === unit.lessons.length;
 
-          // Intercala lições + baú de tesouro no meio + troféu final da unidade
           type PathItem =
             | { kind: 'lesson'; lesson: Lesson; idx: number }
             | { kind: 'chest'; id: string; unlocked: boolean }
@@ -215,13 +309,12 @@ export function LearnView({
             unlocked: unitCompleted,
           });
 
-          // Decide em qual lado fica o bonequinho animado (lado oposto à curvatura dos nós!)
           const companionSide: 'left' | 'right' = unitIndex % 2 === 0 ? 'right' : 'left';
-          const companionRowIndex = Math.min(1, Math.max(0, pathItems.length - 2));
+          const companionRowIndex = Math.min(2, Math.max(0, pathItems.length - 2));
 
           return (
             <section key={unit.id} className="space-y-6">
-              {/* BANNER COLORIDO DA UNIDADE (Igual ao Duolingo!) */}
+              {/* BANNER COLORIDO DA UNIDADE */}
               <div
                 className="rounded-[22px] p-5 text-white border-2 border-b-[6px] flex items-center justify-between gap-4 shadow-xs"
                 style={{
@@ -231,7 +324,7 @@ export function LearnView({
               >
                 <div className="min-w-0">
                   <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-white/85">
-                    UNIDADE {unit.order} · {doneInUnit}/{unit.lessons.length} CONCLUÍDAS
+                    ETAPA {unit.order} · {doneInUnit}/{unit.lessons.length} PEÇAS ENCAIXADAS
                   </div>
                   <h2 className="font-display text-xl sm:text-2xl leading-tight mt-0.5">
                     {unit.titlePt}
@@ -255,23 +348,17 @@ export function LearnView({
               {/* CAMINHO SINUOSO EM S */}
               <div className="relative flex flex-col items-center gap-7 py-3">
                 {pathItems.map((item, stepIdx) => {
-                  const offset = WINDING_OFFSETS[(stepIdx + unitIndex * 2) % WINDING_OFFSETS.length] ?? 0;
+                  const offset =
+                    WINDING_OFFSETS[(stepIdx + unitIndex * 2) % WINDING_OFFSETS.length] ?? 0;
 
-                  // Personagem animado ao lado do caminho nesta altura
                   const showCompanionHere = stepIdx === companionRowIndex;
 
                   if (item.kind === 'chest') {
                     const isOpen = Boolean(openedChests[item.id]);
                     const isCelebrating = chestCelebration === item.id;
                     return (
-                      <div
-                        key={item.id}
-                        className="relative flex items-center justify-center w-full"
-                      >
-                        <div
-                          className="relative"
-                          style={{ transform: `translateX(${offset}px)` }}
-                        >
+                      <div key={item.id} className="relative flex items-center justify-center w-full">
+                        <div className="relative" style={{ transform: `translateX(${offset}px)` }}>
                           <ConfettiBurst active={isCelebrating} />
                           {isCelebrating && (
                             <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 rounded-full bg-[var(--na-gold)] text-[#4a2e00] text-xs font-extrabold shadow-sm z-20">
@@ -330,7 +417,7 @@ export function LearnView({
                                 if (unit.lessons[0]) setSelectedLessonId(unit.lessons[0].id);
                               }
                             }}
-                            aria-label={`Troféu da Unidade ${unit.order}`}
+                            aria-label={`Prêmio da Etapa ${unit.order}`}
                             className="duo-path-node"
                             style={{
                               backgroundColor: item.unlocked ? '#F4B400' : '#EFE7DC',
@@ -342,7 +429,9 @@ export function LearnView({
                           </button>
                         </div>
                         <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--na-muted)] mt-2">
-                          {item.unlocked ? `Unidade ${unit.order} conquistada! 🏆` : `Troféu da Unidade ${unit.order}`}
+                          {item.unlocked
+                            ? `Quebra-Cabeça ${unit.order} completo! 🏆`
+                            : `Prêmio da Etapa ${unit.order}`}
                         </span>
                       </div>
                     );
@@ -354,36 +443,23 @@ export function LearnView({
                   const isCurrent = nextLesson?.id === lesson.id;
                   const isSelected = selectedLessonId === lesson.id;
 
-                  const nodeBg = done
-                    ? '#F4B400'
-                    : isCurrent
-                      ? theme.bg
-                      : '#FFFFFF';
-                  const nodeBorder = done
-                    ? '#C98A00'
-                    : isCurrent
-                      ? theme.border
-                      : '#D9CCBC';
+                  const nodeBg = done ? '#F4B400' : isCurrent ? theme.bg : '#FFFFFF';
+                  const nodeBorder = done ? '#C98A00' : isCurrent ? theme.border : '#D9CCBC';
                   const nodeIconColor = done || isCurrent ? '#FFFFFF' : theme.bg;
 
                   return (
-                    <div
-                      key={lesson.id}
-                      className="relative flex flex-col items-center w-full"
-                    >
-                      {/* Bonequinho animado ao lado da trilha! */}
-                      {showCompanionHere && (
+                    <div key={lesson.id} className="relative flex flex-col items-center w-full">
+                      {/* Bonequinho da unidade ao lado da trilha (quando NÃO for o nó onde o bichinho do aluno está) */}
+                      {showCompanionHere && !isCurrent && (
                         <div
                           className={`absolute top-1/2 -translate-y-1/2 z-10 ${
-                            companionSide === 'right'
-                              ? 'right-2 sm:right-6'
-                              : 'left-2 sm:left-6'
+                            companionSide === 'right' ? 'right-2 sm:right-6' : 'left-2 sm:left-6'
                           }`}
                         >
                           <InteractiveCast
                             character={theme.cast}
-                            size={104}
-                            mood={isCurrent ? 'wave' : 'idle'}
+                            size={96}
+                            mood="idle"
                             customPhrase={
                               user.activeLanguage === 'ko'
                                 ? '안녕하세요! Vamos lá! 🧩'
@@ -397,7 +473,49 @@ export function LearnView({
                         className="relative flex flex-col items-center"
                         style={{ transform: `translateX(${offset}px)` }}
                       >
-                        {/* Balão "COMEÇAR!" pulando em cima da lição ativa (marca registrada do Duolingo!) */}
+                        {/* SEU BICHINHO CAMINHANDO ATÉ ESTE NÓ E PARANDO DO LADO DELE! */}
+                        {isCurrent && (
+                          <motion.div
+                            key={`${lesson.id}-${petWalkingOnPath ? 'walk' : 'stand'}`}
+                            initial={
+                              petWalkingOnPath
+                                ? { y: -115, x: offset > 0 ? -70 : 70, opacity: 0.95 }
+                                : false
+                            }
+                            animate={{ y: 0, x: 0, opacity: 1 }}
+                            transition={{ duration: 1.45, ease: 'easeInOut' }}
+                            className={`absolute top-1/2 -translate-y-1/2 z-30 ${
+                              offset >= 0 ? '-left-[104px]' : '-right-[104px]'
+                            }`}
+                          >
+                            <div className="relative flex flex-col items-center">
+                              <ConfettiBurst active={petArrivedCheer} />
+                              {(petWalkingOnPath || petArrivedCheer) && (
+                                <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-full bg-white border-2 border-[var(--na-burgundy)] text-[10px] font-extrabold text-[var(--na-burgundy)] shadow-xs">
+                                  {petWalkingOnPath ? '🐾 Andando...' : 'Cheguei! Vamos! 🎉'}
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  playTapSound();
+                                  onOpenPetPicker();
+                                }}
+                                aria-label={`Bichinho ${pet.name}`}
+                                className="cursor-pointer"
+                              >
+                                <PetSprite
+                                  species={pet.species}
+                                  mood={petPathMood}
+                                  size={88}
+                                  facingLeft={offset < 0}
+                                />
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {/* Balão "COMEÇAR!" pulando em cima da lição ativa */}
                         {isCurrent && !isSelected && (
                           <div
                             className="animate-na-callout absolute -top-12 left-1/2 z-20 px-4 py-1.5 rounded-2xl bg-white border-2 shadow-sm text-xs font-extrabold uppercase tracking-wider whitespace-nowrap"
@@ -411,7 +529,6 @@ export function LearnView({
                           </div>
                         )}
 
-                        {/* Anel brilhante em volta do nó ativo */}
                         <div
                           className={`rounded-full p-1.5 transition-all ${
                             isCurrent ? 'ring-4 ring-offset-4 ring-offset-[var(--na-cream)]' : ''
@@ -427,9 +544,7 @@ export function LearnView({
                             onClick={() => {
                               void hapticTap();
                               playTapSound();
-                              setSelectedLessonId((prev) =>
-                                prev === lesson.id ? null : lesson.id,
-                              );
+                              setSelectedLessonId((prev) => (prev === lesson.id ? null : lesson.id));
                             }}
                             aria-label={lesson.titlePt}
                             className="duo-path-node"
@@ -447,13 +562,12 @@ export function LearnView({
                           </button>
                         </div>
 
-                        {/* Rótulo curtinho e amigável embaixo do nó */}
                         <span className="mt-1.5 max-w-[140px] text-center text-xs font-extrabold text-[var(--na-ink)] leading-tight">
                           {lesson.titlePt}
                         </span>
                       </div>
 
-                      {/* POPOVER ESTILO DUOLINGO AO TOCAR NO NÓ */}
+                      {/* POPOVER DA LIÇÃO */}
                       {isSelected && (
                         <motion.div
                           initial={{ opacity: 0, y: -6, scale: 0.96 }}
@@ -466,7 +580,7 @@ export function LearnView({
                         >
                           <div>
                             <div className="text-[11px] font-extrabold uppercase tracking-wider text-white/85">
-                              LIÇÃO {lesson.order} · {lesson.exercises.length} DESAFIOS ·{' '}
+                              ATIVIDADE {lesson.order} · {lesson.exercises.length} DESAFIOS ·{' '}
                               {lesson.durationMinutes} MIN
                             </div>
                             <h3 className="font-display text-lg leading-snug mt-0.5">
@@ -492,7 +606,9 @@ export function LearnView({
                             }}
                           >
                             <Play size={18} weight="fill" />
-                            {done ? `PRATICAR DE NOVO (+${lesson.xpReward} XP)` : `COMEÇAR (+${lesson.xpReward} XP)`}
+                            {done
+                              ? `PRATICAR DE NOVO (+${lesson.xpReward} PEÇAS 🧩)`
+                              : `COMEÇAR (+${lesson.xpReward} PEÇAS 🧩)`}
                           </button>
                         </motion.div>
                       )}
@@ -505,21 +621,56 @@ export function LearnView({
         })}
       </div>
 
-      {/* PAINEL LATERAL DIREITO (DESKTOP — IGUAL AO DUOLINGO WEB!) */}
+      {/* PAINEL LATERAL DIREITO (DESKTOP) */}
       <aside className="hidden lg:flex lg:flex-col w-80 shrink-0 sticky top-6 space-y-4">
-        {/* Card Meta Diária com o Puz */}
+        {/* Card Meu Bichinho */}
         <div className="duo-card p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-display text-lg text-[var(--na-ink)]">Meta de hoje</h3>
-            <span className="text-xs font-extrabold text-[var(--na-flame)] inline-flex items-center gap-1">
-              <Fire size={16} weight="fill" /> {user.streakDays}d seguidos
+            <h3 className="font-display text-lg text-[var(--na-ink)]">Meu Bichinho</h3>
+            <span className="text-xs font-extrabold text-[var(--na-burgundy)] inline-flex items-center gap-1">
+              <Heart size={15} weight="fill" /> {pet.happiness}%
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <PuzzleMascot mood={dailyPct >= 100 ? 'celebrate' : 'happy'} size={66} />
+            <PetSprite species={pet.species} mood={petPathMood} size={74} />
+            <div className="flex-1 space-y-1.5">
+              <div className="text-sm font-extrabold text-[var(--na-ink)]">{pet.name}</div>
+              <div className="h-3.5 rounded-full bg-[var(--na-sand)] overflow-hidden p-0.5">
+                <div
+                  className="h-full rounded-full bg-[var(--na-success)] transition-all duration-500"
+                  style={{ width: `${pet.happiness}%` }}
+                />
+              </div>
+              <div className="text-[11px] font-bold text-[var(--na-muted)]">
+                Acerte atividades para deixá-lo super feliz!
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              onOpenPetPicker();
+            }}
+            className="duo-btn-gold w-full min-h-[44px] text-xs uppercase tracking-wide"
+          >
+            FAZER CARINHO / TROCAR BICHINHO
+          </button>
+        </div>
+
+        {/* Card Foco Diário */}
+        <div className="duo-card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-display text-lg text-[var(--na-ink)]">Foco de hoje</h3>
+            <span className="text-xs font-extrabold text-[var(--na-flame)] inline-flex items-center gap-1">
+              <Fire size={16} weight="fill" /> {user.streakDays}d no ritmo
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <PuzzleMascot mood={dailyPct >= 100 ? 'celebrate' : 'happy'} size={62} />
             <div className="flex-1 space-y-1.5">
               <div className="text-xs font-extrabold text-[var(--na-ink)]">
-                Ganhe {dailyGoalXp} XP hoje!
+                Junte {dailyGoalXp} Peças 🧩 hoje!
               </div>
               <div className="h-4 rounded-full bg-[var(--na-sand)] overflow-hidden p-0.5">
                 <div
@@ -527,14 +678,11 @@ export function LearnView({
                   style={{ width: `${Math.max(12, dailyPct)}%` }}
                 />
               </div>
-              <div className="text-[11px] font-bold text-[var(--na-muted)]">
-                {user.xpTotal} XP acumulado · Energia infinita ❤️
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Card Prática de Letras / Sons */}
+        {/* Card Letras / Sons */}
         <div className="duo-card p-5 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[var(--na-teal-soft)] border-2 border-[var(--na-teal)] text-[var(--na-teal-dark)] font-display text-xl flex items-center justify-center shrink-0">
@@ -561,7 +709,7 @@ export function LearnView({
           </button>
         </div>
 
-        {/* Card Conversa com Personagem IA */}
+        {/* Card Conversa com IA */}
         <div className="duo-card p-5 space-y-3">
           <div className="flex items-center gap-3">
             <InteractiveCast character="leo" size={62} />
@@ -584,7 +732,6 @@ export function LearnView({
           </button>
         </div>
 
-        {/* Atalho Revisão */}
         <button
           type="button"
           onClick={() => {
@@ -600,7 +747,7 @@ export function LearnView({
         </button>
       </aside>
 
-      {/* MODAL DO GUIA DA UNIDADE (Dicas + Frases que falam ao tocar!) */}
+      {/* MODAL DO GUIA DA UNIDADE */}
       {guideUnit && (
         <div className="fixed inset-0 z-50 bg-black/45 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <motion.div
@@ -611,7 +758,7 @@ export function LearnView({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-teal)]">
-                  Guia da Unidade {guideUnit.order}
+                  Guia da Etapa {guideUnit.order}
                 </div>
                 <h3 className="font-display text-2xl text-[var(--na-ink)] mt-0.5">
                   {guideUnit.titlePt}
@@ -628,42 +775,44 @@ export function LearnView({
             </div>
 
             <div className="p-4 rounded-2xl bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] text-sm font-semibold text-[#5a3b00] leading-relaxed">
-              💡 <strong>Dica do Puz: </strong>
+              💡 <strong>Dica do {pet.name}: </strong>
               {guideUnit.culturalNotePt}
             </div>
 
             <div className="space-y-2">
               <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)]">
-                Frases e palavras desta unidade (toque para ouvir!):
+                Frases e palavras desta etapa (toque para ouvir!):
               </div>
-              {guideUnit.lessons.flatMap((l) => l.exercises.slice(0, 2)).map((ex) => (
-                <button
-                  key={ex.id}
-                  type="button"
-                  onClick={() => {
-                    playTapSound();
-                    speakText(ex.targetText, user.activeLanguage, 0.88);
-                  }}
-                  className="w-full p-3.5 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] hover:border-[var(--na-teal)] flex items-center justify-between gap-3 text-left"
-                >
-                  <div>
-                    <div className="font-extrabold text-base text-[var(--na-ink)]">
-                      {ex.targetText}
-                    </div>
-                    {ex.reading && (
-                      <div className="font-mono-code text-xs font-bold text-[var(--na-teal)]">
-                        {ex.reading}
+              {guideUnit.lessons
+                .flatMap((l) => l.exercises.slice(0, 2))
+                .map((ex) => (
+                  <button
+                    key={ex.id}
+                    type="button"
+                    onClick={() => {
+                      playTapSound();
+                      speakText(ex.targetText, user.activeLanguage, 0.88);
+                    }}
+                    className="w-full p-3.5 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] hover:border-[var(--na-teal)] flex items-center justify-between gap-3 text-left"
+                  >
+                    <div>
+                      <div className="font-extrabold text-base text-[var(--na-ink)]">
+                        {ex.targetText}
                       </div>
-                    )}
-                    <div className="text-xs font-semibold text-[var(--na-muted)]">
-                      {ex.translationPt}
+                      {ex.reading && (
+                        <div className="font-mono-code text-xs font-bold text-[var(--na-teal)]">
+                          {ex.reading}
+                        </div>
+                      )}
+                      <div className="text-xs font-semibold text-[var(--na-muted)]">
+                        {ex.translationPt}
+                      </div>
                     </div>
-                  </div>
-                  <span className="w-10 h-10 rounded-xl bg-[var(--na-teal)] text-white flex items-center justify-center shrink-0">
-                    <SpeakerHigh size={18} weight="fill" />
-                  </span>
-                </button>
-              ))}
+                    <span className="w-10 h-10 rounded-xl bg-[var(--na-teal)] text-white flex items-center justify-center shrink-0">
+                      <SpeakerHigh size={18} weight="fill" />
+                    </span>
+                  </button>
+                ))}
             </div>
 
             <button

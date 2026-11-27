@@ -107,3 +107,23 @@ export function playVictoryFanfare(): void {
   ];
   melody.forEach(([f, t, d]) => playTone(f, t, d, 'triangle', 0.15));
 }
+
+export function playFootstepsSound(steps = 4): void {
+  for (let i = 0; i < steps; i++) {
+    const pitch = i % 2 === 0 ? 290 : 340;
+    playTone(pitch, i * 0.14, 0.06, 'triangle', 0.075);
+  }
+}
+
+export function playPetSadSound(): void {
+  // Som bem macio e fofo de "awwn" quando o bichinho fica tristinho
+  playTone(392, 0, 0.16, 'sine', 0.09);
+  playTone(330, 0.14, 0.2, 'sine', 0.085);
+  playTone(277, 0.28, 0.26, 'sine', 0.07);
+}
+
+export function playPetHappySound(): void {
+  playTone(587.33, 0, 0.09, 'triangle', 0.1);
+  playTone(783.99, 0.08, 0.11, 'triangle', 0.11);
+  playTone(1046.5, 0.16, 0.18, 'sine', 0.12);
+}

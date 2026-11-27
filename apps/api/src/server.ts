@@ -132,6 +132,16 @@ export async function buildServer() {
       root: webDistDir,
       prefix: '/',
       wildcard: false,
+      setHeaders: (res, filePath) => {
+        if (
+          filePath.endsWith('sw.js') ||
+          filePath.endsWith('registerSW.js') ||
+          filePath.endsWith('manifest.webmanifest') ||
+          filePath.endsWith('index.html')
+        ) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      },
     });
 
     app.setNotFoundHandler((req, reply) => {

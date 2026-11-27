@@ -100,24 +100,24 @@ export function ProfileView({
         </button>
       </section>
 
-      {/* Estatísticas vibrantes */}
+      {/* Estatísticas vibrantes (Autismo & TDAH) */}
       <section className="grid grid-cols-3 gap-3">
         <div className="duo-card p-4 text-center bg-[var(--na-flame-soft)]/50">
           <Fire size={26} weight="fill" className="mx-auto text-[var(--na-flame)]" />
           <div className="text-2xl font-extrabold text-[var(--na-ink)] mt-1">{user.streakDays}</div>
-          <div className="text-xs font-bold text-[var(--na-muted)]">Dias seguidos</div>
+          <div className="text-xs font-bold text-[var(--na-muted)]">Ritmo de Foco</div>
         </div>
         <div className="duo-card p-4 text-center bg-[var(--na-gold-soft)]/60">
           <Trophy size={26} weight="fill" className="mx-auto text-[var(--na-gold-dark)]" />
           <div className="text-2xl font-extrabold text-[var(--na-ink)] mt-1">
             {user.longestStreak}
           </div>
-          <div className="text-xs font-bold text-[var(--na-muted)]">Recorde</div>
+          <div className="text-xs font-bold text-[var(--na-muted)]">Maior Ritmo</div>
         </div>
         <div className="duo-card p-4 text-center bg-[var(--na-teal-soft)]/60">
           <PuzzlePiece size={26} weight="fill" className="mx-auto text-[var(--na-teal)]" />
           <div className="text-2xl font-extrabold text-[var(--na-ink)] mt-1">{user.xpTotal}</div>
-          <div className="text-xs font-bold text-[var(--na-muted)]">Peças XP</div>
+          <div className="text-xs font-bold text-[var(--na-muted)]">Peças 🧩</div>
         </div>
       </section>
 

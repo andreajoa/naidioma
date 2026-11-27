@@ -221,11 +221,11 @@ export function AlphabetView({ language }: AlphabetViewProps) {
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-xs font-extrabold uppercase tracking-wider">
             <Sparkle size={14} weight="fill" />
             {language === 'ko'
-              ? 'Aba Hangul (한) · Igual ao Duolingo!'
+              ? 'Aba Hangul (한) · Peças de Som 🧩'
               : language === 'ja'
-                ? 'Aba Hiragana (あ)'
+                ? 'Aba Hiragana (あ) · Peças de Som 🧩'
                 : language === 'zh'
-                  ? 'Aba 4 Tons & Pinyin (拼)'
+                  ? 'Aba 4 Tons & Pinyin (拼) · Peças de Som 🧩'
                   : `Laboratório de Sons · ${langMeta.namePt}`}
           </div>
           <h1 className="font-display text-2xl sm:text-3xl leading-tight">

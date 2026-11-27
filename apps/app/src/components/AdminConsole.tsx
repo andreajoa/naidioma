@@ -243,7 +243,7 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
                         <th className="py-2 pr-3">WhatsApp</th>
                         <th className="py-2 pr-3">Idioma</th>
                         <th className="py-2 pr-3">Origem</th>
-                        <th className="py-2">XP</th>
+                        <th className="py-2">Peças</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--na-border)]">
