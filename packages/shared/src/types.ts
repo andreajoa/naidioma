@@ -13,7 +13,7 @@ export const LanguageCodeSchema = z.enum([
 
 export type LanguageCode = z.infer<typeof LanguageCodeSchema>;
 
-export const CefrLevelSchema = z.enum(['A1', 'A2', 'B1', 'B2', 'C1']);
+export const CefrLevelSchema = z.enum(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 export type CefrLevel = z.infer<typeof CefrLevelSchema>;
 
 export const SkillDimensionSchema = z.enum([
@@ -114,10 +114,13 @@ export const LessonSchema = z.object({
   order: z.number().int().positive(),
   titlePt: z.string(),
   subtitlePt: z.string(),
-  durationMinutes: z.number().int().min(2).max(15),
-  xpReward: z.number().int().min(10).max(120),
+  durationMinutes: z.number().int().min(2).max(20),
+  xpReward: z.number().int().min(10).max(250),
   cefr: CefrLevelSchema,
   focusSkill: SkillDimensionSchema,
+  isLevelExam: z.boolean().optional(),
+  passingAccuracy: z.number().int().min(50).max(100).optional(),
+  unlocksCefr: CefrLevelSchema.optional(),
   exercises: z.array(ExerciseSchema).min(3),
 });
 export type Lesson = z.infer<typeof LessonSchema>;
@@ -130,6 +133,8 @@ export const UnitSchema = z.object({
   titlePt: z.string(),
   descriptionPt: z.string(),
   culturalNotePt: z.string(),
+  grammarFocusPt: z.string().optional(),
+  isExamUnit: z.boolean().optional(),
   lessons: z.array(LessonSchema).min(1),
 });
 export type Unit = z.infer<typeof UnitSchema>;

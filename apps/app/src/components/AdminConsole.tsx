@@ -324,20 +324,26 @@ export function AdminConsole({ onBack, onConfigChanged }: AdminConsoleProps) {
               <form onSubmit={handleSaveConfig} className="surface-card p-6 space-y-5">
                 <div className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--na-border)]">
                   <div>
-                    <h3 className="font-display text-2xl">IA na Nuvem (Ollama / Kaggle T4 x2)</h3>
+                    <h3 className="font-display text-2xl">IA 24/7 na Nuvem (Llama 3.3 70B + Whisper + Ollama)</h3>
                     <p className="text-xs text-[var(--na-muted)]">
-                      Assim que sua GPU do Kaggle liberar, cole aqui a URL do túnel ou Ollama Cloud.
+                      {overview.runtime.openaiBaseUrl
+                        ? `Motor 24/7 ativo: ${overview.runtime.openaiModel || 'llama-3.3-70b'} (${overview.runtime.openaiBaseUrl}) + Whisper HD grátis.`
+                        : 'Configure OPENAI_BASE_URL / OPENAI_API_KEY (Llama 3.3 24/7 grátis) ou uma URL do Ollama/Kaggle abaixo.'}
                     </p>
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
-                      overview.ollamaStatus.reachable
+                      overview.runtime.openaiBaseUrl || overview.ollamaStatus.reachable
                         ? 'bg-[var(--na-success-soft)] text-[var(--na-success)]'
                         : 'bg-[var(--na-sand)] text-[var(--na-muted)]'
                     }`}
                   >
                     <CloudCheck size={15} weight="fill" />
-                    {overview.ollamaStatus.reachable ? 'Ollama Online' : 'Fallback Ativo'}
+                    {overview.runtime.openaiBaseUrl
+                      ? 'Llama 3.3 · 24/7'
+                      : overview.ollamaStatus.reachable
+                        ? 'Ollama Online'
+                        : 'Fallback Ativo'}
                   </span>
                 </div>
 

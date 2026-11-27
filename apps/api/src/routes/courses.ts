@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   LANGUAGE_LIST,
+  LESSON_MASTERY_THRESHOLD,
   LanguageCodeSchema,
+  computeCourseLevelProgress,
   createInitialFsrsCard,
   getAllFlashcards,
   getCourse,
@@ -142,6 +144,31 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
     const { accuracy } = parsed.data;
     const { language, lesson } = found;
+    const course = getCourse(language);
+
+    // Exige domínio real de TODAS as etapas do nível antes de aceitar a Prova Oficial de Passagem!
+    if (lesson.isLevelExam) {
+      const progressRows = await prisma.lessonProgress.findMany({
+        where: { userId: user.id, language },
+      });
+      const completedMap = Object.fromEntries(
+        progressRows.map((p) => [
+          p.lessonId,
+          { bestAccuracy: p.bestAccuracy, completedCount: p.completedCount },
+        ]),
+      );
+      const levels = computeCourseLevelProgress(course, completedMap);
+      const targetLevel = levels.find((l) => l.cefr === lesson.cefr);
+      if (targetLevel && !targetLevel.examReady) {
+        const remaining = targetLevel.totalStudyLessons - targetLevel.masteredStudyLessons;
+        return reply.status(403).send({
+          error: `Conclua e domine todas as etapas do Nível ${lesson.cefr} (≥ ${LESSON_MASTERY_THRESHOLD}%) antes da Prova Oficial. Faltam ${remaining} atividade(s).`,
+        });
+      }
+    }
+
+    const passingAccuracy = lesson.passingAccuracy ?? 80;
+    const passedExam = !lesson.isLevelExam || accuracy >= passingAccuracy;
     const xpGained = Math.max(15, Math.round((lesson.xpReward * Math.max(50, accuracy)) / 100));
 
     const existing = await prisma.lessonProgress.findUnique({
@@ -209,6 +236,14 @@ export async function registerCourseRoutes(app: FastifyInstance) {
       streakDays: updatedUser.streakDays,
       xpTotal: updatedUser.xpTotal,
       skills: nextSkill,
+      levelExam: lesson.isLevelExam
+        ? {
+            cefr: lesson.cefr,
+            passed: passedExam,
+            passingAccuracy,
+            unlockedNextCefr: passedExam ? lesson.unlocksCefr ?? null : null,
+          }
+        : null,
     };
   });
 

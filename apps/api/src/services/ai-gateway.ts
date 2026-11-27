@@ -98,6 +98,10 @@ async function callOllamaJson(
   }
 }
 
+function normalizeOpenAiOrigin(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
+}
+
 async function callOpenAiCompatibleJson(
   baseUrl: string,
   apiKey: string,
@@ -105,19 +109,22 @@ async function callOpenAiCompatibleJson(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<Record<string, unknown>> {
+  const origin = normalizeOpenAiOrigin(baseUrl);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 16_000);
+  const timeout = setTimeout(() => controller.abort(), 24_000);
   try {
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const res = await fetch(`${origin}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'User-Agent': 'NAidioma-API/1.0',
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       },
       signal: controller.signal,
       body: JSON.stringify({
         model,
-        temperature: 0.45,
+        max_tokens: 900,
+        temperature: 0.35,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -360,6 +367,22 @@ export async function runConversationTurn(input: ChatTurnInput): Promise<ChatTur
     run: () => Promise<Record<string, unknown>>;
   }> = [];
 
+  // Prioridade 24/7 grátis: Llama 3.3 70B (nexacloud-ai-engine) -> Ollama/Kaggle (se configurado) -> Gemini -> Local
+  if (runtime.openaiBaseUrl) {
+    tryProviders.push({
+      provider: 'openai-compatible',
+      model: runtime.openaiModel || 'llama-3.3-70b',
+      run: () =>
+        callOpenAiCompatibleJson(
+          runtime.openaiBaseUrl,
+          config.openaiApiKey,
+          runtime.openaiModel || 'llama-3.3-70b',
+          systemPrompt,
+          userPrompt,
+        ),
+    });
+  }
+
   if (runtime.ollamaBaseUrl) {
     tryProviders.push({
       provider: 'ollama',
@@ -369,21 +392,6 @@ export async function runConversationTurn(input: ChatTurnInput): Promise<ChatTur
           runtime.ollamaBaseUrl,
           runtime.ollamaModel || 'inkling-2-small',
           runtime.ollamaApiKey,
-          systemPrompt,
-          userPrompt,
-        ),
-    });
-  }
-
-  if (runtime.openaiBaseUrl) {
-    tryProviders.push({
-      provider: 'openai-compatible',
-      model: runtime.openaiModel || 'gpt-4o-mini',
-      run: () =>
-        callOpenAiCompatibleJson(
-          runtime.openaiBaseUrl,
-          config.openaiApiKey,
-          runtime.openaiModel || 'gpt-4o-mini',
           systemPrompt,
           userPrompt,
         ),
@@ -434,6 +442,29 @@ export async function explainPhrase(
 
   const systemPrompt = `You are a Brazilian-Portuguese-native polyglot coach teaching ${langMeta.namePt}. Return JSON with keys: breakdownPt, literalVsNaturalPt, brazilianPitfallPt, examples (array of 2 objects with target, optional reading, translationPt). Keep explanations crisp, warm, and direct in PT-BR.`;
   const userPrompt = `Explain this phrase in ${langMeta.nativeName}: "${phrase}"`;
+
+  if (runtime.openaiBaseUrl) {
+    try {
+      const raw = await callOpenAiCompatibleJson(
+        runtime.openaiBaseUrl,
+        config.openaiApiKey,
+        runtime.openaiModel || 'llama-3.3-70b',
+        systemPrompt,
+        userPrompt,
+      );
+      if (typeof raw.breakdownPt === 'string' && Array.isArray(raw.examples)) {
+        return {
+          breakdownPt: raw.breakdownPt,
+          literalVsNaturalPt: String(raw.literalVsNaturalPt ?? ''),
+          brazilianPitfallPt: String(raw.brazilianPitfallPt ?? ''),
+          examples: raw.examples.slice(0, 2) as ExplainPhraseResponse['examples'],
+          providerUsed: 'openai-compatible',
+        };
+      }
+    } catch {
+      // fall through
+    }
+  }
 
   if (runtime.ollamaBaseUrl) {
     try {
@@ -552,4 +583,163 @@ export async function pingOllamaEndpoint(): Promise<{
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export interface TranscribeAudioResult {
+  available: boolean;
+  transcript: string;
+  provider: string;
+  model?: string;
+  latencyMs: number;
+}
+
+export async function getAiCapabilities(): Promise<{
+  aiOnline: boolean;
+  primaryProvider: ActiveAiProvider;
+  primaryModel: string;
+  sttAvailable: boolean;
+}> {
+  const runtime = await getRuntimeSettings();
+  if (runtime.openaiBaseUrl && config.openaiApiKey) {
+    return {
+      aiOnline: true,
+      primaryProvider: 'openai-compatible',
+      primaryModel: runtime.openaiModel || 'llama-3.3-70b',
+      sttAvailable: true,
+    };
+  }
+  if (runtime.ollamaBaseUrl) {
+    return {
+      aiOnline: true,
+      primaryProvider: 'ollama',
+      primaryModel: runtime.ollamaModel || 'inkling-2-small',
+      sttAvailable: Boolean(config.geminiApiKey),
+    };
+  }
+  if (config.geminiApiKey) {
+    return {
+      aiOnline: true,
+      primaryProvider: 'gemini',
+      primaryModel: config.geminiModel,
+      sttAvailable: true,
+    };
+  }
+  return {
+    aiOnline: false,
+    primaryProvider: 'local-pedagogical',
+    primaryModel: 'naidioma-pedagogical-v1',
+    sttAvailable: false,
+  };
+}
+
+/**
+ * 24/7 Cloud Whisper Speech-to-Text via nexacloud-ai-engine (Cloudflare Workers AI free tier)
+ * with automatic fallback to Gemini 2.5 Flash audio if configured.
+ * Transcribes strictly what the learner actually spoke — both normal and slow word-by-word speech.
+ */
+export async function transcribeAudioBuffer(input: {
+  audioBase64: string;
+  mimeType?: string;
+  language: LanguageCode;
+}): Promise<TranscribeAudioResult> {
+  const startedAt = Date.now();
+  const runtime = await getRuntimeSettings();
+  const cleanBase64 = input.audioBase64.replace(/^data:[^;]+;base64,/, '').trim();
+
+  if (runtime.openaiBaseUrl && config.openaiApiKey) {
+    const origin = normalizeOpenAiOrigin(runtime.openaiBaseUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 16_000);
+    try {
+      const res = await fetch(`${origin}/v1/audio/transcriptions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'NAidioma-API/1.0',
+          Authorization: `Bearer ${config.openaiApiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          audioBase64: cleanBase64,
+          language: input.language,
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { text?: string; model?: string };
+        return {
+          available: true,
+          transcript: String(data.text ?? '').trim(),
+          provider: 'cloudflare-whisper',
+          model: data.model ?? '@cf/openai/whisper-large-v3-turbo',
+          latencyMs: Date.now() - startedAt,
+        };
+      }
+    } catch {
+      // fall through to Gemini if available
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  if (config.geminiApiKey) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 16_000);
+    try {
+      const langName = LANGUAGES[input.language].nativeName;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.geminiModel)}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: input.mimeType || 'audio/webm',
+                    data: cleanBase64,
+                  },
+                },
+                {
+                  text: `Transcribe verbatim EVERY spoken word in ${langName} heard in this audio clip (including short words like "a", "the", "to", "is", "in", even when spoken slowly word by word). Do NOT invent words that were not spoken. Return JSON: {"transcript":"..."}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        const parsed = extractJsonObject(raw);
+        const transcript = typeof parsed?.transcript === 'string' ? parsed.transcript.trim() : '';
+        return {
+          available: true,
+          transcript,
+          provider: 'gemini-audio',
+          model: config.geminiModel,
+          latencyMs: Date.now() - startedAt,
+        };
+      }
+    } catch {
+      // fall through
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return {
+    available: false,
+    transcript: '',
+    provider: 'browser-only',
+    latencyMs: Date.now() - startedAt,
+  };
 }

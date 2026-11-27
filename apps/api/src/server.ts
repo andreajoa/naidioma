@@ -14,6 +14,7 @@ import { registerBillingRoutes } from './routes/billing.js';
 import { registerCourseRoutes } from './routes/courses.js';
 import { registerFeedbackAndAdminRoutes } from './routes/feedback-admin.js';
 import { registerPushRoutes } from './routes/push.js';
+import { getAiCapabilities } from './services/ai-gateway.js';
 import {
   getCloudSyncStatus,
   pushDatabaseToCloudflare,
@@ -27,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function buildServer() {
   const app = Fastify({
     logger: process.env.NODE_ENV !== 'test',
-    bodyLimit: 1_048_576,
+    bodyLimit: 4_194_304,
   });
 
   // Preserve raw body for Stripe webhook cryptographic verification
@@ -76,7 +77,7 @@ export async function buildServer() {
   });
 
   app.get('/api/health', async () => {
-    const runtime = await getRuntimeSettings();
+    const [runtime, aiCaps] = await Promise.all([getRuntimeSettings(), getAiCapabilities()]);
     let dbOk = true;
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -91,6 +92,10 @@ export async function buildServer() {
       freeBetaMode: runtime.freeBetaMode,
       billingUiEnabled: runtime.billingUiEnabled,
       ollamaConfigured: Boolean(runtime.ollamaBaseUrl),
+      aiConfigured: aiCaps.aiOnline,
+      aiProvider: aiCaps.primaryProvider,
+      aiModel: aiCaps.primaryModel,
+      sttConfigured: aiCaps.sttAvailable,
       cloudSync: getCloudSyncStatus(),
       timestamp: new Date().toISOString(),
     };

@@ -500,6 +500,7 @@ export function App() {
             <LessonPlayer
               language={user.activeLanguage}
               lesson={activeLesson}
+              unit={courseDetail?.course.units.find((u) => u.id === activeLesson.unitId)}
               pet={pet}
               onPetHappinessChange={handlePetHappinessChange}
               onExit={() => setActiveLesson(null)}

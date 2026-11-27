@@ -2,7 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { LanguageCodeSchema, getScenarioById } from '@naidioma/shared';
 import { prisma } from '../lib/prisma.js';
-import { explainPhrase, runConversationTurn } from '../services/ai-gateway.js';
+import {
+  explainPhrase,
+  getAiCapabilities,
+  runConversationTurn,
+  transcribeAudioBuffer,
+} from '../services/ai-gateway.js';
 import { getRuntimeSettings } from '../services/runtime-config.js';
 import { requireUser } from './auth.js';
 
@@ -25,7 +30,29 @@ const ExplainSchema = z.object({
   phrase: z.string().trim().min(1).max(300),
 });
 
+const TranscribeSchema = z.object({
+  language: LanguageCodeSchema,
+  audioBase64: z.string().min(100).max(3_200_000),
+  mimeType: z.string().max(80).optional(),
+});
+
 export async function registerAiRoutes(app: FastifyInstance) {
+  app.get('/api/ai/status', async () => {
+    return getAiCapabilities();
+  });
+
+  app.post('/api/ai/transcribe', async (req, reply) => {
+    const user = await requireUser(req);
+    if (!user) return reply.status(401).send({ error: 'Sessão necessária.' });
+
+    const parsed = TranscribeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Áudio inválido ou grande demais para transcrição.' });
+    }
+
+    return transcribeAudioBuffer(parsed.data);
+  });
+
   app.post('/api/ai/conversation', async (req, reply) => {
     const user = await requireUser(req);
     if (!user) return reply.status(401).send({ error: 'Sessão necessária.' });

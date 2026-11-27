@@ -401,6 +401,46 @@ export const api = {
     }
   },
 
+  getAiStatus: async () => {
+    try {
+      return await request<{
+        aiOnline: boolean;
+        primaryProvider: string;
+        primaryModel: string;
+        sttAvailable: boolean;
+      }>('/api/ai/status');
+    } catch {
+      return {
+        aiOnline: false,
+        primaryProvider: 'offline',
+        primaryModel: 'local',
+        sttAvailable: false,
+      };
+    }
+  },
+
+  transcribeAudio: async (language: LanguageCode, audioBase64: string, mimeType?: string) => {
+    try {
+      return await request<{
+        available: boolean;
+        transcript: string;
+        provider: string;
+        model?: string;
+        latencyMs: number;
+      }>('/api/ai/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({ language, audioBase64, mimeType }),
+      });
+    } catch {
+      return {
+        available: false,
+        transcript: '',
+        provider: 'offline',
+        latencyMs: 0,
+      };
+    }
+  },
+
   sendFeedback: (payload: {
     category: FeedbackCategory;
     language?: LanguageCode;

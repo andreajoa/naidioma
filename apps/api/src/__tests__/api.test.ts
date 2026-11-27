@@ -81,6 +81,24 @@ describe('NAidioma API Integration', () => {
     });
     expect(reviewRes.statusCode).toBe(200);
     expect(reviewRes.json().intervalDays).toBeGreaterThanOrEqual(1);
+
+    // Official Level Exam MUST be blocked (403) before mastering all study stages of A1
+    const earlyExamRes = await app.inject({
+      method: 'POST',
+      url: '/api/lessons/en-exam-a1/complete',
+      headers: { Authorization: `Bearer ${authToken}` },
+      payload: { accuracy: 100, durationSeconds: 180 },
+    });
+    expect(earlyExamRes.statusCode).toBe(403);
+  });
+
+  it('exposes AI capabilities status endpoint for 24/7 Llama 3.3 & Whisper detection', async () => {
+    const statusRes = await app.inject({ method: 'GET', url: '/api/ai/status' });
+    expect(statusRes.statusCode).toBe(200);
+    const body = statusRes.json();
+    expect(typeof body.aiOnline).toBe('boolean');
+    expect(typeof body.sttAvailable).toBe('boolean');
+    expect(typeof body.primaryModel).toBe('string');
   });
 
   it('handles AI conversation gracefully even before Ollama/Kaggle URL is set', async () => {

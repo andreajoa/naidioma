@@ -18,7 +18,15 @@ import {
 } from '@naidioma/shared';
 import { api } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
-import { createSpeechRecognizer, isSpeechRecognitionSupported, speakText } from '../lib/speech';
+import {
+  createAudioRecorder,
+  createSpeechRecognizer,
+  isAudioRecorderSupported,
+  isSpeechRecognitionSupported,
+  speakText,
+  type AudioRecorderHandle,
+  type SpeechRecognizerHandle,
+} from '../lib/speech';
 import { InteractiveCast } from './Mascots';
 
 interface ConversationViewProps {
@@ -43,9 +51,11 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [quotaLeft, setQuotaLeft] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const recognizerRef = useRef<{ start: () => void; stop: () => void } | null>(null);
+  const recognizerRef = useRef<SpeechRecognizerHandle | null>(null);
+  const audioRecorderRef = useRef<AudioRecorderHandle | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -117,32 +127,65 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
     }
   }
 
-  function toggleVoiceCapture() {
+  async function toggleVoiceCapture() {
     if (recording) {
-      recognizerRef.current?.stop();
       setRecording(false);
+      setTranscribing(true);
+      try {
+        const [speechRes, clip] = await Promise.all([
+          recognizerRef.current ? recognizerRef.current.stop() : Promise.resolve({ text: '', alternatives: [] }),
+          audioRecorderRef.current ? audioRecorderRef.current.stop() : Promise.resolve(null),
+        ]);
+        recognizerRef.current = null;
+        audioRecorderRef.current = null;
+
+        let finalText = speechRes.text.trim();
+        if (clip && (!finalText || finalText.split(/\s+/).length < 2)) {
+          const cloud = await api.transcribeAudio(language, clip.audioBase64, clip.mimeType);
+          if (cloud.available && cloud.transcript.trim()) {
+            finalText = cloud.transcript.trim();
+          }
+        }
+        if (finalText) setDraft(finalText);
+      } finally {
+        setTranscribing(false);
+      }
       return;
     }
 
-    if (!isSpeechRecognitionSupported()) {
+    const canWebSpeech = isSpeechRecognitionSupported();
+    const canRecorder = isAudioRecorderSupported();
+    if (!canWebSpeech && !canRecorder) {
       setError('Reconhecimento de voz não suportado neste navegador. Digite sua resposta abaixo.');
       return;
     }
 
     setError(null);
-    const rec = createSpeechRecognizer(language, {
-      onTranscript: (text) => setDraft(text),
-      onError: (msg) => {
-        setError(msg);
-        setRecording(false);
-      },
-      onEnd: () => setRecording(false),
-    });
+    if (canWebSpeech) {
+      const rec = createSpeechRecognizer(language, {
+        onTranscript: (text) => {
+          if (text.trim()) setDraft(text);
+        },
+        onError: (msg) => {
+          if (!canRecorder) setError(msg);
+        },
+        onEnd: () => {},
+      });
+      if (rec) {
+        recognizerRef.current = rec;
+        rec.start();
+      }
+    }
 
-    if (!rec) return;
-    recognizerRef.current = rec;
+    if (canRecorder) {
+      const recorder = createAudioRecorder();
+      if (recorder) {
+        audioRecorderRef.current = recorder;
+        await recorder.start();
+      }
+    }
+
     setRecording(true);
-    rec.start();
   }
 
   if (!activeScenario) {
@@ -343,7 +386,8 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
       >
         <button
           type="button"
-          onClick={toggleVoiceCapture}
+          disabled={transcribing}
+          onClick={() => void toggleVoiceCapture()}
           aria-label={recording ? 'Parar microfone' : 'Falar no microfone'}
           className={`w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0 transition-all ${
             recording
@@ -358,7 +402,11 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Responda em ${langMeta.nativeName}...`}
+          placeholder={
+            transcribing
+              ? 'Transcrevendo sua fala com precisão...'
+              : `Responda em ${langMeta.nativeName}...`
+          }
           className="flex-1 min-h-[48px] px-4 rounded-[14px] bg-[var(--na-ivory)] border border-[var(--na-border)] text-sm text-[var(--na-ink)]"
         />
 
