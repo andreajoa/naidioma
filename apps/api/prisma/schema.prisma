@@ -2,9 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// 100% Cloud PostgreSQL (NexaCloud / Neon / Supabase)
+// Cloud-persisted SQLite (WAL) inside NexaCloud container with automatic
+// AES-256-GCM encrypted replication to Cloudflare (NexaCloud Private KV).
+// Zero Neon compute-hour lockouts, zero external DB ceilings.
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

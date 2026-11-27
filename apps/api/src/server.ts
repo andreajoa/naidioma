@@ -13,6 +13,11 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerBillingRoutes } from './routes/billing.js';
 import { registerCourseRoutes } from './routes/courses.js';
 import { registerFeedbackAndAdminRoutes } from './routes/feedback-admin.js';
+import {
+  getCloudSyncStatus,
+  pushDatabaseToCloudflare,
+  scheduleCloudSync,
+} from './services/cloud-sync.js';
 import { getRuntimeSettings } from './services/runtime-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -84,6 +89,7 @@ export async function buildServer() {
       freeBetaMode: runtime.freeBetaMode,
       billingUiEnabled: runtime.billingUiEnabled,
       ollamaConfigured: Boolean(runtime.ollamaBaseUrl),
+      cloudSync: getCloudSyncStatus(),
       timestamp: new Date().toISOString(),
     };
   });
@@ -91,6 +97,26 @@ export async function buildServer() {
   app.get('/api/cron/health-ping', async () => {
     await prisma.$queryRaw`SELECT 1`;
     return { ok: true, pingedAt: new Date().toISOString() };
+  });
+
+  app.get('/api/cron/backup', async () => {
+    return pushDatabaseToCloudflare();
+  });
+
+  // Automatically replicate every successful write mutation to Cloudflare (NexaCloud Private KV)
+  app.addHook('onResponse', (req, reply, done) => {
+    if (
+      req.url.startsWith('/api/') &&
+      (req.method === 'POST' ||
+        req.method === 'PUT' ||
+        req.method === 'PATCH' ||
+        req.method === 'DELETE') &&
+      reply.statusCode >= 200 &&
+      reply.statusCode < 300
+    ) {
+      scheduleCloudSync();
+    }
+    done();
   });
 
   await registerAuthRoutes(app);

@@ -22,12 +22,15 @@ COPY . .
 ARG NC_ENV_HASH
 RUN --mount=type=secret,id=ncenv sh -c 'set -a; [ -f /run/secrets/ncenv ] && . /run/secrets/ncenv; set +a; pnpm --filter @naidioma/api db:generate && pnpm build'
 
+RUN mkdir -p /app/data
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 ENV HOSTNAME=0.0.0.0
 ENV SERVE_WEB_DIST=true
+ENV DATABASE_URL="file:/app/data/naidioma.db"
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm --filter @naidioma/api db:push && pnpm start"]
+CMD ["sh", "-c", "node apps/api/dist/scripts/cloud-restore.js && pnpm --filter @naidioma/api db:push && pnpm start"]
