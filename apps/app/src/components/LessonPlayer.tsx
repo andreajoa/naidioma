@@ -5,12 +5,12 @@ import {
   CheckCircle,
   Eye,
   EyeSlash,
-  Info,
+  Fire,
+  Heart,
   Microphone,
   SpeakerHigh,
   Sparkle,
   StopCircle,
-  Trophy,
   WarningCircle,
   X,
 } from '@phosphor-icons/react';
@@ -23,7 +23,14 @@ import {
 } from '@naidioma/shared';
 import { api } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
+import {
+  playCorrectSound,
+  playGentleRetrySound,
+  playTapSound,
+  playVictoryFanfare,
+} from '../lib/sound';
 import { createSpeechRecognizer, isSpeechRecognitionSupported, speakText } from '../lib/speech';
+import { ConfettiBurst, PuzzleMascot, type MascotMood } from './Mascots';
 
 interface LessonPlayerProps {
   language: LanguageCode;
@@ -31,6 +38,13 @@ interface LessonPlayerProps {
   onExit: () => void;
   onCompleted: (summary: { xpGained: number; streakDays: number; xpTotal: number }) => void;
 }
+
+const HAPPY_PRAISES = [
+  'Incrível! Você arrasou! 🎉',
+  'Mandou muito bem! ⭐',
+  'Perfeito! Continue assim! 🧩',
+  'Show de bola! 🚀',
+];
 
 export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPlayerProps) {
   const langMeta = LANGUAGES[language];
@@ -41,6 +55,13 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
   const [isRecording, setIsRecording] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [showRomanization, setShowRomanization] = useState(true);
+
+  // Match Pairs state (exercício favorito das crianças no Duolingo!)
+  const [selectedLeftPairId, setSelectedLeftPairId] = useState<string | null>(null);
+  const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
+  const [wrongPairFlash, setWrongPairFlash] = useState<string | null>(null);
+
+  const [combo, setCombo] = useState(0);
   const [checked, setChecked] = useState<null | {
     correct: boolean;
     messagePt: string;
@@ -64,11 +85,37 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
   const exercise: Exercise | undefined = lesson.exercises[index];
   const progressPct = Math.round(((index + (checked ? 1 : 0)) / lesson.exercises.length) * 100);
 
+  // Embaralha deterministicamente a coluna direita do match_pairs
+  const shuffledRightPairs = useMemo(() => {
+    if (!exercise?.pairs) return [];
+    return [...exercise.pairs].sort((a, b) => {
+      const ha = a.right.charCodeAt(0) * 13 + a.id.charCodeAt(a.id.length - 1);
+      const hb = b.right.charCodeAt(0) * 13 + b.id.charCodeAt(b.id.length - 1);
+      return (ha % 11) - (hb % 11);
+    });
+  }, [exercise]);
+
   useEffect(() => {
     return () => {
       recognizerRef.current?.stop();
     };
   }, []);
+
+  // Reproduz automaticamente o áudio em exercícios de escuta/figuras (igual ao Duolingo!)
+  useEffect(() => {
+    if (!exercise) return undefined;
+    if (
+      exercise.type === 'listen_build' ||
+      exercise.type === 'picture_choice' ||
+      exercise.type === 'script_lab'
+    ) {
+      const timer = setTimeout(() => {
+        speakText(exercise.targetText, language, 0.9);
+      }, 280);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [exercise, language]);
 
   const availableBank = useMemo(() => {
     if (!exercise?.wordBank) return [];
@@ -89,6 +136,9 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
     setBuiltTokens([]);
     setSpokenText('');
     setSpeechError(null);
+    setSelectedLeftPairId(null);
+    setMatchedPairIds([]);
+    setWrongPairFlash(null);
     setChecked(null);
     setAiExplain(null);
     recognizerRef.current?.stop();
@@ -98,6 +148,7 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
   function handleSpeakToggle() {
     if (!exercise) return;
     void hapticTap();
+    playTapSound();
 
     if (isRecording) {
       recognizerRef.current?.stop();
@@ -106,7 +157,7 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
     }
 
     if (!isSpeechRecognitionSupported()) {
-      setSpeechError('Seu navegador não suporta reconhecimento de voz. Digite a frase abaixo para testar!');
+      setSpeechError('Microfone indisponível neste navegador — você pode digitar ou tocar em "Pular fala".');
       return;
     }
 
@@ -121,13 +172,57 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
     });
 
     if (!rec) {
-      setSpeechError('Reconhecimento de voz indisponível aqui. Digite a frase abaixo.');
+      setSpeechError('Reconhecimento de voz indisponível aqui. Digite abaixo ou pule este passo.');
       return;
     }
 
     recognizerRef.current = rec;
     setIsRecording(true);
     rec.start();
+  }
+
+  function handlePairRightTap(pairId: string) {
+    if (!exercise?.pairs || !selectedLeftPairId || checked || matchedPairIds.includes(pairId)) {
+      return;
+    }
+    if (selectedLeftPairId === pairId) {
+      const nextMatched = [...matchedPairIds, pairId];
+      setMatchedPairIds(nextMatched);
+      setSelectedLeftPairId(null);
+      void hapticSuccess();
+      playCorrectSound(nextMatched.length);
+
+      if (nextMatched.length === exercise.pairs.length) {
+        const nextCombo = combo + 1;
+        setCombo(nextCombo);
+        setCorrectCount((prev) => prev + 1);
+        setChecked({
+          correct: true,
+          messagePt: HAPPY_PRAISES[index % HAPPY_PRAISES.length]!,
+        });
+      }
+    } else {
+      void hapticError();
+      playGentleRetrySound();
+      setWrongPairFlash(pairId);
+      setTimeout(() => {
+        setWrongPairFlash(null);
+        setSelectedLeftPairId(null);
+      }, 480);
+    }
+  }
+
+  function handleSkipSpeaking() {
+    if (!exercise || checked) return;
+    void hapticTap();
+    playTapSound();
+    recognizerRef.current?.stop();
+    setIsRecording(false);
+    setCorrectCount((prev) => prev + 1);
+    setChecked({
+      correct: true,
+      messagePt: 'Sem problema! Pulamos a gravação por agora — ouça a frase e siga em frente! 🧩',
+    });
   }
 
   function handleCheck() {
@@ -141,19 +236,20 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
       exercise.type === 'context_choice' ||
       exercise.type === 'trap_buster' ||
       exercise.type === 'dialogue_complete' ||
-      exercise.type === 'script_lab'
+      exercise.type === 'script_lab' ||
+      exercise.type === 'picture_choice'
     ) {
       isCorrect = selectedOption === exercise.correctOptionId;
       messagePt = isCorrect
-        ? 'Acertou em cheio! Resposta natural.'
-        : `Quase lá! A resposta mais natural é: "${exercise.targetText}".`;
+        ? HAPPY_PRAISES[index % HAPPY_PRAISES.length]!
+        : `Quase lá! A resposta certa é: "${exercise.targetText}".`;
     } else if (exercise.type === 'listen_build') {
       const expected = (exercise.correctTokens ?? []).join(' ').trim().toLowerCase();
       const userAnswer = builtTokens.join(' ').trim().toLowerCase();
       isCorrect = expected === userAnswer;
       messagePt = isCorrect
-        ? 'Frase montada perfeitamente!'
-        : `Ordem natural: "${exercise.targetText}".`;
+        ? 'Frase montada perfeitamente! 🧩'
+        : `Ordem certa: "${exercise.targetText}".`;
     } else if (exercise.type === 'speak_pronounce') {
       const evaluation = evaluatePronunciation(
         spokenText,
@@ -167,10 +263,15 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
     }
 
     if (isCorrect) {
+      const nextCombo = combo + 1;
+      setCombo(nextCombo);
       void hapticSuccess();
+      playCorrectSound(nextCombo);
       setCorrectCount((prev) => prev + 1);
     } else {
+      setCombo(0);
       void hapticError();
+      playGentleRetrySound();
     }
 
     setChecked({ correct: isCorrect, messagePt, score });
@@ -178,6 +279,7 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
 
   async function handleNext() {
     void hapticTap();
+    playTapSound();
     if (index + 1 < lesson.exercises.length) {
       setIndex((i) => i + 1);
       resetQuestionState();
@@ -191,15 +293,18 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
     try {
       const res = await api.completeLesson(lesson.id, accuracy, durationSeconds);
       void hapticSuccess();
+      playVictoryFanfare();
       setFinished({ accuracy, xpGained: res.xpGained, streakDays: res.streakDays });
       onCompleted(res);
     } catch {
+      playVictoryFanfare();
       setFinished({ accuracy, xpGained: lesson.xpReward, streakDays: 1 });
     }
   }
 
   async function handleAskAiExplain() {
     if (!exercise) return;
+    playTapSound();
     setAiExplain({ loading: true });
     try {
       const res = await api.explainPhrase(language, exercise.targetText);
@@ -219,53 +324,72 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
   const canCheck = Boolean(
     exercise &&
       !checked &&
+      exercise.type !== 'match_pairs' &&
       ((exercise.type === 'listen_build' && builtTokens.length > 0) ||
         (exercise.type === 'speak_pronounce' && spokenText.trim().length > 0) ||
         selectedOption !== null),
   );
 
+  // TELA DE VITÓRIA ÉPICA ESTILO DUOLINGO COM PUZ DANÇANDO E CONFETE!
   if (finished) {
     return (
-      <div className="min-h-[75dvh] flex items-center justify-center p-4">
+      <div className="min-h-[82dvh] flex items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
+          initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="surface-card max-w-md w-full p-7 text-center space-y-5"
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="duo-card max-w-md w-full p-7 text-center space-y-6 relative overflow-visible"
         >
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-[var(--na-wine)] text-[var(--na-gold)] flex items-center justify-center">
-            <Trophy size={34} weight="fill" />
+          <ConfettiBurst active />
+          <div className="flex justify-center">
+            <PuzzleMascot mood="celebrate" size={160} />
           </div>
+
           <div>
-            <h2 className="font-display text-4xl text-[var(--na-ink)]">Lição concluída!</h2>
-            <p className="text-sm text-[var(--na-muted)] mt-1">{lesson.titlePt}</p>
+            <div className="inline-block px-3.5 py-1 rounded-full bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] text-xs font-extrabold uppercase tracking-wider text-[#7a5200]">
+              Lição completa! 🏆
+            </div>
+            <h2 className="font-display text-3xl sm:text-4xl text-[var(--na-ink)] mt-2">
+              Você brilhou demais!
+            </h2>
+            <p className="text-sm font-bold text-[var(--na-muted)] mt-1">{lesson.titlePt}</p>
           </div>
+
           <div className="grid grid-cols-3 gap-2.5">
-            <div className="surface-sand p-3">
-              <div className="text-xl font-extrabold text-[var(--na-burgundy)]">
+            <div className="p-3 rounded-2xl bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)]">
+              <div className="text-xs font-extrabold uppercase text-[#8a6010]">XP Ganho</div>
+              <div className="text-2xl font-extrabold text-[#7a5200] mt-0.5">
                 +{finished.xpGained}
               </div>
-              <div className="text-[11px] text-[var(--na-muted)]">XP ganho</div>
             </div>
-            <div className="surface-sand p-3">
-              <div className="text-xl font-extrabold text-[var(--na-success)]">
+            <div className="p-3 rounded-2xl bg-[var(--na-success-soft)] border-2 border-[var(--na-success)]">
+              <div className="text-xs font-extrabold uppercase text-[var(--na-success-dark)]">
+                Acertos
+              </div>
+              <div className="text-2xl font-extrabold text-[var(--na-success-dark)] mt-0.5">
                 {finished.accuracy}%
               </div>
-              <div className="text-[11px] text-[var(--na-muted)]">Precisão</div>
             </div>
-            <div className="surface-sand p-3">
-              <div className="text-xl font-extrabold text-[var(--na-teal)]">
-                {finished.streakDays}d
+            <div className="p-3 rounded-2xl bg-[var(--na-flame-soft)] border-2 border-[var(--na-flame)]">
+              <div className="text-xs font-extrabold uppercase text-[var(--na-flame-dark)]">
+                Ofensiva
               </div>
-              <div className="text-[11px] text-[var(--na-muted)]">Ofensiva</div>
+              <div className="text-2xl font-extrabold text-[var(--na-flame)] mt-0.5">
+                🔥 {finished.streakDays}d
+              </div>
             </div>
           </div>
+
           <button
             type="button"
-            onClick={onExit}
-            className="btn-tactile-primary w-full text-base flex items-center justify-center gap-2"
+            onClick={() => {
+              playTapSound();
+              onExit();
+            }}
+            className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
           >
-            Voltar para a trilha
-            <ArrowRight size={18} weight="bold" />
+            CONTINUAR NA TRILHA
+            <ArrowRight size={20} weight="bold" />
           </button>
         </motion.div>
       </div>
@@ -274,136 +398,130 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
 
   if (!exercise) return null;
 
+  const mascotMood: MascotMood = checked
+    ? checked.correct
+      ? 'celebrate'
+      : 'encourage'
+    : isRecording
+      ? 'listening'
+      : 'idle';
+
+  const badgeText: Record<Exercise['type'], string> = {
+    picture_choice: 'Escolha a Figura 🖼️',
+    match_pairs: 'Ligue os Pares 🧩',
+    listen_build: 'Monte a Frase 🎧',
+    speak_pronounce: 'Hora de Falar 🎙️',
+    script_lab: 'Leitura & Letras 🔤',
+    context_choice: 'Qual é a certa? ⭐',
+    dialogue_complete: 'Complete a Conversa 💬',
+    trap_buster: 'Pegadinha BR ⚡',
+  };
+
   return (
-    <div className="max-w-2xl mx-auto flex flex-col min-h-[82dvh] justify-between pb-6">
-      {/* Top progress header */}
+    <div className="max-w-2xl mx-auto flex flex-col min-h-[88dvh] justify-between pb-4">
       <div>
-        <div className="flex items-center gap-3 mb-5">
+        {/* TOPO ESTILO DUOLINGO: X + Barra grossa verde/bordô + Combo + Coração ∞ */}
+        <div className="flex items-center gap-3 mb-4">
           <button
             type="button"
-            onClick={onExit}
+            onClick={() => {
+              playTapSound();
+              onExit();
+            }}
             aria-label="Sair da lição"
-            className="w-11 h-11 rounded-[12px] border border-[var(--na-border)] bg-[var(--na-ivory)] flex items-center justify-center text-[var(--na-ink)] shrink-0"
+            className="w-11 h-11 rounded-2xl border-2 border-[var(--na-border)] border-b-4 bg-white flex items-center justify-center text-[var(--na-muted)] hover:text-[var(--na-ink)] shrink-0"
           >
             <X size={20} weight="bold" />
           </button>
-          <div className="flex-1 h-3 rounded-full bg-[var(--na-sand-dark)] overflow-hidden">
-            <div
-              className="h-full bg-[var(--na-burgundy)] rounded-full transition-all duration-300"
-              style={{ width: `${Math.max(8, progressPct)}%` }}
-            />
+
+          <div className="flex-1 h-5 rounded-full bg-[var(--na-sand-dark)] overflow-hidden p-0.5 relative">
+            <motion.div
+              className="h-full bg-[var(--na-success)] rounded-full relative"
+              initial={false}
+              animate={{ width: `${Math.max(10, progressPct)}%` }}
+              transition={{ type: 'spring', stiffness: 220, damping: 24 }}
+            >
+              <span className="absolute top-1 left-2 right-2 h-1 rounded-full bg-white/35" />
+            </motion.div>
           </div>
-          <span className="font-mono-code text-xs font-bold text-[var(--na-muted)] shrink-0">
-            {index + 1}/{lesson.exercises.length}
-          </span>
+
+          {combo >= 2 ? (
+            <span className="px-2.5 py-1 rounded-full bg-[var(--na-flame-soft)] border-2 border-[var(--na-flame)] text-xs font-extrabold text-[var(--na-flame)] inline-flex items-center gap-1 shrink-0">
+              <Fire size={14} weight="fill" /> {combo}x
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-full bg-[var(--na-rose-soft)] text-xs font-extrabold text-[var(--na-burgundy)] inline-flex items-center gap-1 shrink-0">
+              <Heart size={15} weight="fill" /> ∞
+            </span>
+          )}
         </div>
 
-        {/* Exercise type pill + Asian script toggle */}
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <span
-            className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
-              exercise.type === 'trap_buster'
-                ? 'bg-[var(--na-error-soft)] text-[var(--na-error)]'
-                : 'bg-[var(--na-sand)] text-[var(--na-burgundy)]'
-            }`}
-          >
-            {exercise.type === 'trap_buster' && 'Armadilha para Brasileiros'}
-            {exercise.type === 'context_choice' && 'Situação Real'}
-            {exercise.type === 'listen_build' && 'Escuta & Construção'}
-            {exercise.type === 'speak_pronounce' && 'Treino de Voz & Pronúncia'}
-            {exercise.type === 'dialogue_complete' && 'Diálogo Vivo'}
-            {exercise.type === 'script_lab' && 'Laboratório de Escrita & Tons'}
+        {/* Etiqueta do desafio + toggle Romanização */}
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <span className="text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-[var(--na-teal-soft)] text-[var(--na-teal-dark)]">
+            {badgeText[exercise.type]}
           </span>
 
           {langMeta.script.hasNativeScript && (
             <button
               type="button"
-              onClick={() => setShowRomanization((v) => !v)}
-              className="text-xs font-bold px-3 py-1.5 rounded-full bg-[var(--na-ivory)] border border-[var(--na-border)] text-[var(--na-teal)] inline-flex items-center gap-1.5"
+              onClick={() => {
+                playTapSound();
+                setShowRomanization((v) => !v);
+              }}
+              className="text-xs font-extrabold px-3 py-1.5 rounded-full bg-white border-2 border-[var(--na-border)] text-[var(--na-teal-dark)] inline-flex items-center gap-1.5"
             >
-              {showRomanization ? <Eye size={14} /> : <EyeSlash size={14} />}
-              {langMeta.script.romanizationLabel}: {showRomanization ? 'Ligado' : 'Oculto'}
+              {showRomanization ? <Eye size={14} weight="bold" /> : <EyeSlash size={14} weight="bold" />}
+              {langMeta.script.romanizationLabel}: {showRomanization ? 'ON' : 'OFF'}
             </button>
           )}
         </div>
 
-        {/* Prompt card */}
-        <div className="surface-card p-5 sm:p-6 space-y-4">
-          {exercise.contextSituationPt && (
-            <div className="text-xs font-semibold text-[var(--na-teal)]">
-              Contexto: {exercise.contextSituationPt}
-            </div>
-          )}
+        {/* PERSONAGEM PUZ + BALÃO DE PERGUNTA (IGUAL AO DUOLINGO!) */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="relative shrink-0">
+            <ConfettiBurst active={Boolean(checked?.correct)} />
+            <PuzzleMascot mood={mascotMood} size={86} />
+          </div>
+          <div className="flex-1 p-4 rounded-2xl bg-white border-2 border-[var(--na-border)] border-b-4 space-y-2.5">
+            <h2 className="text-base sm:text-lg font-extrabold text-[var(--na-ink)] leading-snug">
+              {exercise.promptPt}
+            </h2>
 
-          <h2 className="text-lg sm:text-xl font-bold text-[var(--na-ink)] leading-snug">
-            {exercise.promptPt}
-          </h2>
-
-          {/* Audio controls for listening / speaking / script */}
-          {(exercise.type === 'listen_build' ||
-            exercise.type === 'speak_pronounce' ||
-            exercise.type === 'script_lab') && (
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  void hapticTap();
-                  speakText(exercise.targetText, language, 1.0);
-                }}
-                className="min-h-[46px] px-4 rounded-[12px] bg-[var(--na-teal)] text-white font-bold text-sm inline-flex items-center gap-2"
-              >
-                <SpeakerHigh size={18} weight="fill" />
-                Ouvir nativo
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void hapticTap();
-                  speakText(exercise.targetText, language, 0.72);
-                }}
-                className="min-h-[46px] px-4 rounded-[12px] bg-[var(--na-sand)] text-[var(--na-ink)] font-semibold text-sm"
-              >
-                Devagar (0.75x)
-              </button>
-            </div>
-          )}
-
-          {/* Dialogue view */}
-          {exercise.type === 'dialogue_complete' && exercise.dialogueLines && (
-            <div className="space-y-2.5 pt-1">
-              {exercise.dialogueLines.map((line, i) => (
-                <div
-                  key={i}
-                  className={`p-3.5 rounded-[14px] border ${
-                    line.isBlank
-                      ? 'bg-[var(--na-sand)]/70 border-dashed border-[var(--na-burgundy)]'
-                      : 'bg-[var(--na-cream)] border-[var(--na-border)]'
-                  }`}
+            {/* Botões de áudio grandes: Normal 🔊 + Tartaruga Devagar 🐢 */}
+            {exercise.type !== 'match_pairs' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    void hapticTap();
+                    speakText(exercise.targetText, language, 0.95);
+                  }}
+                  className="min-h-[42px] px-3.5 rounded-xl bg-[var(--na-teal)] text-white border-2 border-[var(--na-teal-dark)] border-b-4 text-xs font-extrabold inline-flex items-center gap-1.5 active:translate-y-[2px]"
                 >
-                  <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[var(--na-muted)] mb-1">
-                    <span>{line.speaker}</span>
-                    {!line.isBlank && (
-                      <button
-                        type="button"
-                        onClick={() => speakText(line.text, language, 0.95)}
-                        className="text-[var(--na-teal)] inline-flex items-center gap-1"
-                      >
-                        <SpeakerHigh size={14} weight="fill" /> Ouvir
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-base font-bold text-[var(--na-ink)]">
-                    {line.isBlank ? 'Escolha a resposta mais natural abaixo...' : line.text}
-                  </div>
-                  <div className="text-xs text-[var(--na-muted)] mt-0.5">{line.translationPt}</div>
-                </div>
-              ))}
-            </div>
-          )}
+                  <SpeakerHigh size={17} weight="fill" />
+                  Ouvir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void hapticTap();
+                    speakText(exercise.targetText, language, 0.65);
+                  }}
+                  className="min-h-[42px] px-3 rounded-xl bg-[var(--na-cream)] text-[var(--na-ink)] border-2 border-[var(--na-border)] border-b-4 text-xs font-extrabold inline-flex items-center gap-1 active:translate-y-[2px]"
+                >
+                  🐢 Devagar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {/* Multiple choice options */}
-          {exercise.options && (
-            <div className="space-y-2.5 pt-2">
+        {/* ÁREA INTERATIVA DO DESAFIO */}
+        <div className="space-y-4">
+          {/* 1. PICTURE CHOICE (Grade 2x2 de cartões grandes com emoji/figura — AMADO POR CRIANÇAS!) */}
+          {exercise.type === 'picture_choice' && exercise.options && (
+            <div className="grid grid-cols-2 gap-3">
               {exercise.options.map((opt) => {
                 const chosen = selectedOption === opt.id;
                 const isRight = checked && opt.id === exercise.correctOptionId;
@@ -415,27 +533,190 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
                     disabled={Boolean(checked)}
                     onClick={() => {
                       void hapticTap();
+                      playTapSound();
                       setSelectedOption(opt.id);
+                      speakText(opt.text, language, 0.9);
                     }}
-                    className={`w-full min-h-[54px] px-4 py-3 rounded-[14px] border text-left transition-all flex items-center justify-between gap-3 ${
+                    className={`p-4 rounded-3xl border-2 border-b-[6px] flex flex-col items-center justify-center gap-1.5 text-center transition-all active:translate-y-[2px] min-h-[148px] ${
                       isRight
-                        ? 'bg-[var(--na-success-soft)] border-[var(--na-success)] text-[var(--na-success)] font-bold'
+                        ? 'bg-[var(--na-success-soft)] border-[var(--na-success)] text-[var(--na-success-dark)]'
                         : isWrongChosen
                           ? 'bg-[var(--na-error-soft)] border-[var(--na-error)] text-[var(--na-error)]'
                           : chosen
-                            ? 'bg-[var(--na-sand)] border-[var(--na-burgundy)] text-[var(--na-wine-deep)] font-bold'
-                            : 'bg-[var(--na-cream)] border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-gold)]'
+                            ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                            : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-gold)]'
                     }`}
                   >
-                    <div>
-                      <div className="text-[15px] leading-snug">{opt.text}</div>
+                    {opt.emoji && (
+                      <span className="text-5xl leading-none mb-1" role="img" aria-hidden="true">
+                        {opt.emoji}
+                      </span>
+                    )}
+                    <div className="text-xl font-extrabold leading-tight">{opt.text}</div>
+                    {showRomanization && opt.reading && (
+                      <div className="font-mono-code text-xs font-bold text-[var(--na-teal-dark)]">
+                        {opt.reading}
+                      </div>
+                    )}
+                    {checked && opt.translationPt && (
+                      <div className="text-xs font-bold opacity-80">{opt.translationPt}</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 2. MATCH PAIRS (Ligar Pares em 2 colunas de blocos 3D!) */}
+          {exercise.type === 'match_pairs' && exercise.pairs && (
+            <div className="grid grid-cols-2 gap-3">
+              {/* Coluna esquerda: idioma alvo */}
+              <div className="space-y-2.5">
+                {exercise.pairs.map((p) => {
+                  const matched = matchedPairIds.includes(p.id);
+                  const selected = selectedLeftPairId === p.id;
+                  return (
+                    <button
+                      key={`l-${p.id}`}
+                      type="button"
+                      disabled={matched}
+                      onClick={() => {
+                        void hapticTap();
+                        playTapSound();
+                        setSelectedLeftPairId(p.id);
+                        speakText(p.left, language, 0.9);
+                      }}
+                      className={`w-full min-h-[68px] px-3 py-2.5 rounded-2xl border-2 border-b-[5px] text-center transition-all active:translate-y-[2px] ${
+                        matched
+                          ? 'bg-[var(--na-success-soft)] border-[var(--na-success)]/40 text-[var(--na-success-dark)] opacity-55'
+                          : selected
+                            ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)] scale-[1.02]'
+                            : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-teal)]'
+                      }`}
+                    >
+                      <div className="text-lg font-extrabold leading-tight">{p.left}</div>
+                      {showRomanization && p.leftReading && (
+                        <div className="font-mono-code text-[11px] font-bold text-[var(--na-teal)] mt-0.5">
+                          {p.leftReading}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Coluna direita: significado em português */}
+              <div className="space-y-2.5">
+                {shuffledRightPairs.map((p) => {
+                  const matched = matchedPairIds.includes(p.id);
+                  const flashingWrong = wrongPairFlash === p.id;
+                  return (
+                    <button
+                      key={`r-${p.id}`}
+                      type="button"
+                      disabled={matched || !selectedLeftPairId}
+                      onClick={() => handlePairRightTap(p.id)}
+                      className={`w-full min-h-[68px] px-3 py-2.5 rounded-2xl border-2 border-b-[5px] text-center transition-all active:translate-y-[2px] flex items-center justify-center gap-2 ${
+                        matched
+                          ? 'bg-[var(--na-success-soft)] border-[var(--na-success)]/40 text-[var(--na-success-dark)] opacity-55'
+                          : flashingWrong
+                            ? 'bg-[var(--na-error-soft)] border-[var(--na-error)] text-[var(--na-error)]'
+                            : selectedLeftPairId
+                              ? 'bg-white border-[var(--na-gold)] text-[var(--na-ink)] hover:bg-[var(--na-gold-soft)]'
+                              : 'bg-white border-[var(--na-border)] text-[var(--na-ink)]'
+                      }`}
+                    >
+                      {p.emoji && <span className="text-xl">{p.emoji}</span>}
+                      <span className="text-sm sm:text-base font-extrabold leading-tight">
+                        {p.right}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 3. DIÁLOGO */}
+          {exercise.type === 'dialogue_complete' && exercise.dialogueLines && (
+            <div className="space-y-2.5">
+              {exercise.dialogueLines.map((line, i) => (
+                <div
+                  key={i}
+                  className={`p-4 rounded-2xl border-2 ${
+                    line.isBlank
+                      ? 'bg-[var(--na-gold-soft)]/70 border-dashed border-[var(--na-gold-dark)]'
+                      : 'bg-white border-[var(--na-border)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)] mb-1">
+                    <span>{line.speaker}</span>
+                    {!line.isBlank && (
+                      <button
+                        type="button"
+                        onClick={() => speakText(line.text, language, 0.9)}
+                        className="text-[var(--na-teal)] inline-flex items-center gap-1"
+                      >
+                        <SpeakerHigh size={15} weight="fill" /> Ouvir
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-base font-extrabold text-[var(--na-ink)]">
+                    {line.isBlank ? 'Escolha a resposta abaixo 👇' : line.text}
+                  </div>
+                  {line.reading && showRomanization && (
+                    <div className="font-mono-code text-xs font-bold text-[var(--na-teal)] mt-0.5">
+                      {line.reading}
+                    </div>
+                  )}
+                  <div className="text-xs font-semibold text-[var(--na-muted)] mt-0.5">
+                    {line.translationPt}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 4. MÚLTIPLA ESCOLHA 3D (context_choice, trap_buster, dialogue_complete, script_lab) */}
+          {exercise.options && exercise.type !== 'picture_choice' && (
+            <div className="space-y-2.5">
+              {exercise.options.map((opt, optIdx) => {
+                const chosen = selectedOption === opt.id;
+                const isRight = checked && opt.id === exercise.correctOptionId;
+                const isWrongChosen = checked && chosen && !isRight;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={Boolean(checked)}
+                    onClick={() => {
+                      void hapticTap();
+                      playTapSound();
+                      setSelectedOption(opt.id);
+                      speakText(opt.text, language, 0.92);
+                    }}
+                    className={`w-full min-h-[62px] px-4 py-3 rounded-2xl border-2 border-b-[5px] text-left transition-all flex items-center gap-3 active:translate-y-[2px] ${
+                      isRight
+                        ? 'bg-[var(--na-success-soft)] border-[var(--na-success)] text-[var(--na-success-dark)]'
+                        : isWrongChosen
+                          ? 'bg-[var(--na-error-soft)] border-[var(--na-error)] text-[var(--na-error)]'
+                          : chosen
+                            ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                            : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-gold)]'
+                    }`}
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] text-xs font-extrabold flex items-center justify-center shrink-0">
+                      {optIdx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-base font-extrabold leading-snug">{opt.text}</div>
                       {showRomanization && opt.reading && (
-                        <div className="font-mono-code text-xs text-[var(--na-teal)] mt-0.5">
+                        <div className="font-mono-code text-xs font-bold text-[var(--na-teal)] mt-0.5">
                           {opt.reading}
                         </div>
                       )}
                       {opt.translationPt && checked && (
-                        <div className="text-xs opacity-80 mt-0.5">{opt.translationPt}</div>
+                        <div className="text-xs font-bold opacity-80 mt-0.5">{opt.translationPt}</div>
                       )}
                     </div>
                   </button>
@@ -444,32 +725,35 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
             </div>
           )}
 
-          {/* Listen & Build tactile tiles */}
+          {/* 5. LISTEN & BUILD (Bloquinhos 3D que saltam!) */}
           {exercise.type === 'listen_build' && (
-            <div className="space-y-4 pt-2">
-              <div className="min-h-[68px] p-3.5 rounded-[14px] bg-[var(--na-cream)] border-2 border-dashed border-[var(--na-border)] flex flex-wrap gap-2 items-center">
+            <div className="space-y-4">
+              <div className="min-h-[78px] p-4 rounded-2xl bg-white border-2 border-dashed border-[var(--na-teal)]/50 flex flex-wrap gap-2 items-center">
                 {builtTokens.length === 0 ? (
-                  <span className="text-sm text-[var(--na-muted)]">
-                    Toque nas palavras abaixo na ordem correta...
+                  <span className="text-sm font-bold text-[var(--na-muted)]">
+                    Toque nas pecinhas abaixo na ordem certa... 🧩
                   </span>
                 ) : (
                   builtTokens.map((tok, i) => (
-                    <button
+                    <motion.button
                       key={`${tok}-${i}`}
+                      initial={{ scale: 0.8, y: 6 }}
+                      animate={{ scale: 1, y: 0 }}
                       type="button"
                       disabled={Boolean(checked)}
-                      onClick={() =>
-                        setBuiltTokens((prev) => prev.filter((_, idx) => idx !== i))
-                      }
-                      className="min-h-[40px] px-3.5 rounded-[10px] bg-[var(--na-wine)] text-[var(--na-ivory)] text-sm font-bold"
+                      onClick={() => {
+                        playTapSound();
+                        setBuiltTokens((prev) => prev.filter((_, idx) => idx !== i));
+                      }}
+                      className="min-h-[44px] px-4 rounded-2xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-base font-extrabold"
                     >
                       {tok}
-                    </button>
+                    </motion.button>
                   ))
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2.5 justify-center">
                 {availableBank.map(({ token, idx, used }) => (
                   <button
                     key={`${token}-${idx}`}
@@ -477,12 +761,14 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
                     disabled={used || Boolean(checked)}
                     onClick={() => {
                       void hapticTap();
+                      playTapSound();
+                      speakText(token, language, 0.92);
                       setBuiltTokens((prev) => [...prev, token]);
                     }}
-                    className={`min-h-[44px] px-3.5 rounded-[12px] border text-sm font-semibold transition-all ${
+                    className={`min-h-[48px] px-4 rounded-2xl border-2 border-b-4 text-base font-extrabold transition-all active:translate-y-[2px] ${
                       used
-                        ? 'opacity-30 bg-[var(--na-sand)] border-transparent'
-                        : 'bg-[var(--na-ivory)] border-[var(--na-border)] border-b-2 text-[var(--na-ink)] hover:border-[var(--na-burgundy)]'
+                        ? 'opacity-25 bg-[var(--na-sand)] border-transparent text-transparent'
+                        : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-teal)]'
                     }`}
                   >
                     {token}
@@ -492,100 +778,107 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
             </div>
           )}
 
-          {/* Speak & Pronounce real microphone drill */}
+          {/* 6. SPEAK & PRONOUNCE (Com microfone grande + "Não posso falar agora"!) */}
           {exercise.type === 'speak_pronounce' && (
-            <div className="space-y-4 pt-2">
-              <div className="p-4 rounded-[14px] bg-[var(--na-sand)]/70 border border-[var(--na-border)] space-y-1">
-                <div className="text-xl font-bold text-[var(--na-ink)]">{exercise.targetText}</div>
+            <div className="duo-card p-5 space-y-4">
+              <div className="p-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] text-center space-y-1">
+                <div className="text-2xl font-extrabold text-[var(--na-ink)]">
+                  {exercise.targetText}
+                </div>
                 {showRomanization && exercise.reading && (
-                  <div className="font-mono-code text-sm text-[var(--na-teal)]">
+                  <div className="font-mono-code text-sm font-bold text-[var(--na-teal)]">
                     {exercise.reading}
                   </div>
                 )}
                 {exercise.ipaOrPhoneticBr && (
-                  <div className="font-mono-code text-xs text-[var(--na-burgundy)]">
-                    Pronúncia BR: {exercise.ipaOrPhoneticBr}
+                  <div className="text-xs font-extrabold text-[var(--na-burgundy)]">
+                    Como ler: {exercise.ipaOrPhoneticBr}
                   </div>
                 )}
-                <div className="text-xs text-[var(--na-muted)]">{exercise.translationPt}</div>
+                <div className="text-xs font-bold text-[var(--na-muted)]">
+                  "{exercise.translationPt}"
+                </div>
               </div>
 
-              <div className="flex flex-col items-center gap-3 py-2">
+              <div className="flex flex-col items-center gap-3">
                 <button
                   type="button"
                   disabled={Boolean(checked)}
                   onClick={handleSpeakToggle}
-                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-all shadow-md ${
+                  className={`w-24 h-24 rounded-full flex items-center justify-center transition-all border-4 border-b-[8px] active:translate-y-[3px] ${
                     isRecording
-                      ? 'bg-[var(--na-error)] text-white scale-105 animate-pulse'
-                      : 'bg-[var(--na-burgundy)] text-[var(--na-ivory)] hover:bg-[var(--na-wine)]'
+                      ? 'bg-[var(--na-error)] border-[var(--na-error-dark)] text-white scale-105 animate-pulse'
+                      : 'bg-[var(--na-teal)] border-[var(--na-teal-dark)] text-white'
                   }`}
                   aria-label={isRecording ? 'Parar gravação' : 'Falar agora'}
                 >
                   {isRecording ? (
-                    <StopCircle size={34} weight="fill" />
+                    <StopCircle size={40} weight="fill" />
                   ) : (
-                    <Microphone size={34} weight="fill" />
+                    <Microphone size={40} weight="fill" />
                   )}
                 </button>
-                <span className="text-xs font-semibold text-[var(--na-muted)]">
+                <span className="text-xs font-extrabold text-[var(--na-muted)]">
                   {isRecording
                     ? 'Ouvindo você falar... toque para parar'
-                    : 'Toque no microfone e fale a frase acima'}
+                    : 'Toque no microfone e fale a frase!'}
                 </span>
               </div>
 
               {speechError && (
-                <div className="text-xs text-[var(--na-error)] bg-[var(--na-error-soft)] p-3 rounded-[10px]">
+                <div className="text-xs font-bold text-[var(--na-error)] bg-[var(--na-error-soft)] p-3 rounded-xl">
                   {speechError}
                 </div>
               )}
 
-              {/* Accessible keyboard fallback for quiet rooms */}
               <div>
-                <label
-                  htmlFor="na-speech-input"
-                  className="block text-[11px] font-bold uppercase tracking-wider text-[var(--na-muted)] mb-1"
-                >
-                  Transcrição captada (ou digite se estiver em ambiente silencioso):
-                </label>
                 <input
                   id="na-speech-input"
                   type="text"
                   disabled={Boolean(checked)}
                   value={spokenText}
                   onChange={(e) => setSpokenText(e.target.value)}
-                  placeholder="Sua fala aparecerá aqui..."
-                  className="w-full min-h-[46px] px-3.5 rounded-[12px] bg-[var(--na-cream)] border border-[var(--na-border)] text-sm"
+                  placeholder="Ou digite a frase aqui se preferir..."
+                  className="w-full min-h-[48px] px-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] text-sm font-semibold"
                 />
               </div>
+
+              {!checked && (
+                <button
+                  type="button"
+                  onClick={handleSkipSpeaking}
+                  className="w-full py-2 text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)] hover:text-[var(--na-teal)]"
+                >
+                  Não posso falar agora (pular sem perder pontos)
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Bottom Thumb-Zone Action & Feedback Panel */}
+      {/* RODAPÉ DESLIZANTE ESTILO DUOLINGO (Feedback Verde Esmeralda / Coral Gentil) */}
       <div className="mt-6 space-y-3 safe-bottom">
         {checked && (
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`p-4 rounded-[16px] border space-y-2 ${
+            className={`p-4 rounded-3xl border-2 space-y-2.5 ${
               checked.correct
-                ? 'bg-[var(--na-success-soft)] border-[var(--na-success)]/40'
-                : 'bg-[var(--na-error-soft)] border-[var(--na-error)]/40'
+                ? 'bg-[var(--na-success-soft)] border-[var(--na-success)]'
+                : 'bg-[var(--na-error-soft)] border-[var(--na-error)]'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2 font-bold text-sm">
+              <div className="flex items-center gap-2 font-extrabold text-base">
                 {checked.correct ? (
-                  <CheckCircle size={20} weight="fill" className="text-[var(--na-success)]" />
+                  <CheckCircle size={24} weight="fill" className="text-[var(--na-success)] shrink-0" />
                 ) : (
-                  <WarningCircle size={20} weight="fill" className="text-[var(--na-error)]" />
+                  <WarningCircle size={24} weight="fill" className="text-[var(--na-error)] shrink-0" />
                 )}
                 <span
                   className={
-                    checked.correct ? 'text-[var(--na-success)]' : 'text-[var(--na-error)]'
+                    checked.correct ? 'text-[var(--na-success-dark)]' : 'text-[var(--na-error-dark)]'
                   }
                 >
                   {checked.messagePt}
@@ -595,29 +888,25 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
 
               <button
                 type="button"
-                onClick={handleAskAiExplain}
-                className="text-xs font-bold text-[var(--na-teal)] inline-flex items-center gap-1 shrink-0"
+                onClick={() => void handleAskAiExplain()}
+                className="text-xs font-extrabold text-[var(--na-teal-dark)] bg-white px-2.5 py-1 rounded-full border border-[var(--na-teal)]/40 inline-flex items-center gap-1 shrink-0"
               >
                 <Sparkle size={14} weight="fill" />
-                Explicar com IA
+                Explicar IA
               </button>
             </div>
 
-            <div className="text-xs text-[var(--na-ink)] leading-relaxed flex items-start gap-2">
-              <Info size={16} className="text-[var(--na-burgundy)] shrink-0 mt-0.5" />
-              <span>
-                <strong>Dica NAidioma: </strong>
-                {exercise.brazilianTipPt}
-              </span>
+            <div className="text-xs font-bold text-[var(--na-ink)] leading-relaxed">
+              💡 {exercise.brazilianTipPt}
             </div>
 
             {aiExplain && (
-              <div className="p-3 rounded-[10px] bg-[var(--na-ivory)] border border-[var(--na-border)] text-xs text-[var(--na-ink)] space-y-1">
+              <div className="p-3 rounded-2xl bg-white border-2 border-[var(--na-border)] text-xs font-semibold text-[var(--na-ink)] space-y-1">
                 {aiExplain.loading ? (
-                  <span>Consultando explicação personalizada...</span>
+                  <span>O Puz está consultando a IA...</span>
                 ) : (
                   <>
-                    <div className="font-semibold text-[var(--na-teal)]">Coach IA:</div>
+                    <div className="font-extrabold text-[var(--na-teal-dark)]">Coach IA:</div>
                     <div>{aiExplain.breakdownPt}</div>
                   </>
                 )}
@@ -627,22 +916,31 @@ export function LessonPlayer({ language, lesson, onExit, onCompleted }: LessonPl
         )}
 
         {!checked ? (
-          <button
-            type="button"
-            disabled={!canCheck}
-            onClick={handleCheck}
-            className="btn-tactile-primary w-full text-base"
-          >
-            Verificar resposta
-          </button>
+          exercise.type !== 'match_pairs' ? (
+            <button
+              type="button"
+              disabled={!canCheck}
+              onClick={handleCheck}
+              className="duo-btn-emerald w-full text-base uppercase tracking-wide"
+            >
+              VERIFICAR
+            </button>
+          ) : (
+            <div className="text-center text-xs font-extrabold text-[var(--na-muted)] py-2">
+              Toque em uma palavra da esquerda e depois no par certo da direita! ({matchedPairIds.length}/
+              {exercise.pairs?.length ?? 0})
+            </div>
+          )
         ) : (
           <button
             type="button"
-            onClick={handleNext}
-            className="btn-tactile-primary w-full text-base flex items-center justify-center gap-2"
+            onClick={() => void handleNext()}
+            className={`${
+              checked.correct ? 'duo-btn-emerald' : 'duo-btn-coral'
+            } w-full text-base uppercase tracking-wide flex items-center justify-center gap-2`}
           >
-            {index + 1 < lesson.exercises.length ? 'Próximo desafio' : 'Concluir lição'}
-            <ArrowRight size={18} weight="bold" />
+            {index + 1 < lesson.exercises.length ? 'CONTINUAR' : 'VER MINHA VITÓRIA! 🏆'}
+            <ArrowRight size={20} weight="bold" />
           </button>
         )}
       </div>

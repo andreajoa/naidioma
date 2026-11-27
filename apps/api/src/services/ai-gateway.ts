@@ -68,7 +68,7 @@ async function callOllamaJson(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 16_000);
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
     const res = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
@@ -363,11 +363,11 @@ export async function runConversationTurn(input: ChatTurnInput): Promise<ChatTur
   if (runtime.ollamaBaseUrl) {
     tryProviders.push({
       provider: 'ollama',
-      model: runtime.ollamaModel || 'gpt-oss:20b',
+      model: runtime.ollamaModel || 'inkling-2-small',
       run: () =>
         callOllamaJson(
           runtime.ollamaBaseUrl,
-          runtime.ollamaModel || 'gpt-oss:20b',
+          runtime.ollamaModel || 'inkling-2-small',
           runtime.ollamaApiKey,
           systemPrompt,
           userPrompt,
@@ -439,7 +439,7 @@ export async function explainPhrase(
     try {
       const raw = await callOllamaJson(
         runtime.ollamaBaseUrl,
-        runtime.ollamaModel || 'gpt-oss:20b',
+        runtime.ollamaModel || 'inkling-2-small',
         runtime.ollamaApiKey,
         systemPrompt,
         userPrompt,

@@ -12,12 +12,12 @@ export default defineConfig({
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         id: '/',
-        name: 'NAidioma — Fale Idiomas de Verdade',
+        name: 'NAidioma — Aprenda Idiomas Brincando',
         short_name: 'NAidioma',
         description:
-          'Plataforma cutting-edge de 8 idiomas com voz IA e revisão científica FSRS. Funciona offline.',
-        theme_color: '#682b3c',
-        background_color: '#f8f4ed',
+          'Aprenda Coreano, Inglês, Japonês e mais 5 idiomas com trilha divertida, personagens animados e modo offline.',
+        theme_color: '#C12B5B',
+        background_color: '#FFF9F0',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

@@ -66,7 +66,7 @@ export const config: AppConfig = {
   brevoApiKey: (process.env.BREVO_API_KEY ?? '').trim(),
   ollamaBaseUrl: (process.env.OLLAMA_BASE_URL ?? '').trim().replace(/\/+$/, ''),
   ollamaApiKey: (process.env.OLLAMA_API_KEY ?? '').trim(),
-  ollamaModel: (process.env.OLLAMA_MODEL ?? 'gpt-oss:20b').trim(),
+  ollamaModel: (process.env.OLLAMA_MODEL ?? 'inkling-2-small').trim(),
   openaiBaseUrl: (process.env.OPENAI_BASE_URL ?? '').trim().replace(/\/+$/, ''),
   openaiApiKey: (process.env.OPENAI_API_KEY ?? '').trim(),
   openaiModel: (process.env.OPENAI_MODEL ?? 'gpt-4o-mini').trim(),

@@ -1,30 +1,62 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta Oficial Núcleo Afetar (nucleoafetar.com.br) */
-  --na-cream: #f8f4ed;
-  --na-ivory: #fffcf7;
-  --na-sand: #eee5d9;
-  --na-sand-dark: #e4d9c8;
-  --na-burgundy: #783247;
-  --na-wine: #682b3c;
-  --na-wine-deep: #452733;
-  --na-teal: #38697b;
-  --na-gold: #b99a6e;
-  --na-ink: #292b29;
-  --na-muted: #696a65;
-  --na-border: #dfd9cf;
-  --na-success: #285c3b;
-  --na-success-soft: #e6f0e9;
-  --na-error: #9a2c20;
-  --na-error-soft: #faeae8;
+  /* Paleta Oficial Núcleo Afetar — Versão Viva, Alegre & Tátil 3D (Zero Roxo) */
+  --na-cream: #fff9f0;
+  --na-ivory: #ffffff;
+  --na-sand: #f4eadc;
+  --na-sand-dark: #e6d7c4;
+
+  /* Bordô / Rosa-Vinho Vivo (Identidade Núcleo Afetar) */
+  --na-burgundy: #c12b5b;
+  --na-wine: #a31f4a;
+  --na-wine-deep: #7a1436;
+  --na-rose-soft: #ffe8f0;
+
+  /* Azul-Petróleo Vivo */
+  --na-teal: #1496b0;
+  --na-teal-dark: #0c6f84;
+  --na-teal-soft: #e2f7fb;
+
+  /* Verde Esmeralda Alegria (Acertos & Ação Principal) */
+  --na-success: #2cb65e;
+  --na-success-dark: #1d8a45;
+  --na-success-soft: #e2f9eb;
+
+  /* Amarelo-Ouro Sol (Baús, Troféus, Peças) */
+  --na-gold: #f4b400;
+  --na-gold-dark: #c98a00;
+  --na-gold-soft: #fff6d6;
+
+  /* Laranja-Coral Chama (Ofensiva & Combos) */
+  --na-flame: #f26522;
+  --na-flame-dark: #c24810;
+  --na-flame-soft: #ffece3;
+
+  /* Vermelho Coral Gentil (Tentar de novo) */
+  --na-error: #e04338;
+  --na-error-dark: #b02b22;
+  --na-error-soft: #ffeceb;
+
+  /* Texto & Bordas */
+  --na-ink: #242126;
+  --na-muted: #6c6670;
+  --na-border: #e5d8c8;
 }
 
 @layer base {
   html {
     background-color: var(--na-cream);
     color: var(--na-ink);
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'PingFang SC', 'Apple SD Gothic Neo', sans-serif;
+    font-family:
+      'Plus Jakarta Sans',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Hiragino Sans',
+      'Noto Sans JP',
+      'PingFang SC',
+      'Apple SD Gothic Neo',
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
@@ -39,8 +71,8 @@
   }
 
   ::selection {
-    background-color: #d4bcb1;
-    color: #32252a;
+    background-color: #ffd0e0;
+    color: #5b0f28;
   }
 
   button,
@@ -52,69 +84,181 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--na-teal);
+    outline: 3px solid var(--na-teal);
   }
 }
 
 .font-display {
-  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 .font-mono-code {
   font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Tactile button feel for mobile thumbs & desktop */
-.btn-tactile-primary {
+/* ============================================================================
+   SISTEMA 3D TÁTIL ESTILO DUOLINGO (Botões gorduchos que afundam ao tocar)
+   ============================================================================ */
+.duo-btn,
+.btn-tactile-primary,
+.btn-tactile-secondary {
+  border-radius: 16px;
+  min-height: 52px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 100ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 100ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.btn-tactile-primary,
+.duo-btn-wine {
   background-color: var(--na-burgundy);
-  color: var(--na-ivory);
-  border: 1.5px solid var(--na-wine-deep);
-  border-bottom-width: 4px;
-  border-radius: 14px;
-  min-height: 48px;
-  font-weight: 700;
-  transition: transform 120ms ease, background-color 160ms ease, border-bottom-width 120ms ease;
+  color: #ffffff;
+  border: 2px solid var(--na-wine-deep);
+  border-bottom-width: 5px;
+  box-shadow: 0 2px 0 rgba(122, 20, 54, 0.14);
 }
-.btn-tactile-primary:hover:not(:disabled) {
-  background-color: var(--na-wine);
+.btn-tactile-primary:hover:not(:disabled),
+.duo-btn-wine:hover:not(:disabled) {
+  background-color: #cf3365;
 }
-.btn-tactile-primary:active:not(:disabled) {
-  transform: translateY(2px);
+.btn-tactile-primary:active:not(:disabled),
+.duo-btn-wine:active:not(:disabled) {
+  transform: translateY(3px);
   border-bottom-width: 2px;
 }
-.btn-tactile-primary:disabled {
+
+.duo-btn-emerald {
+  background-color: var(--na-success);
+  color: #ffffff;
+  border: 2px solid var(--na-success-dark);
+  border-bottom-width: 5px;
+}
+.duo-btn-emerald:hover:not(:disabled) {
+  background-color: #34c569;
+}
+.duo-btn-emerald:active:not(:disabled) {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.duo-btn-teal {
+  background-color: var(--na-teal);
+  color: #ffffff;
+  border: 2px solid var(--na-teal-dark);
+  border-bottom-width: 5px;
+}
+.duo-btn-teal:hover:not(:disabled) {
+  background-color: #1aa5c1;
+}
+.duo-btn-teal:active:not(:disabled) {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.duo-btn-gold {
+  background-color: var(--na-gold);
+  color: #4a2e00;
+  border: 2px solid var(--na-gold-dark);
+  border-bottom-width: 5px;
+}
+.duo-btn-gold:hover:not(:disabled) {
+  background-color: #ffbe0a;
+}
+.duo-btn-gold:active:not(:disabled) {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.duo-btn-coral {
+  background-color: var(--na-error);
+  color: #ffffff;
+  border: 2px solid var(--na-error-dark);
+  border-bottom-width: 5px;
+}
+.duo-btn-coral:active:not(:disabled) {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.btn-tactile-secondary,
+.duo-btn-white {
+  background-color: #ffffff;
+  color: var(--na-ink);
+  border: 2px solid var(--na-border);
+  border-bottom-width: 5px;
+}
+.btn-tactile-secondary:hover:not(:disabled),
+.duo-btn-white:hover:not(:disabled) {
+  background-color: #fff6ea;
+  border-color: #d7c3ab;
+}
+.btn-tactile-secondary:active:not(:disabled),
+.duo-btn-white:active:not(:disabled) {
+  transform: translateY(3px);
+  border-bottom-width: 2px;
+}
+
+.btn-tactile-primary:disabled,
+.duo-btn:disabled,
+.duo-btn-wine:disabled,
+.duo-btn-emerald:disabled,
+.duo-btn-teal:disabled,
+.duo-btn-gold:disabled,
+.duo-btn-coral:disabled,
+.duo-btn-white:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
 }
 
-.btn-tactile-secondary {
-  background-color: var(--na-ivory);
-  color: var(--na-ink);
-  border: 1.5px solid var(--na-border);
-  border-bottom-width: 3px;
-  border-radius: 14px;
-  min-height: 48px;
-  font-weight: 600;
-  transition: transform 120ms ease, background-color 160ms ease, border-color 160ms ease;
-}
-.btn-tactile-secondary:hover:not(:disabled) {
-  background-color: var(--na-sand);
-  border-color: var(--na-gold);
-}
-.btn-tactile-secondary:active:not(:disabled) {
-  transform: translateY(1.5px);
-}
-
-.surface-card {
-  background-color: var(--na-ivory);
-  border: 1.5px solid var(--na-border);
-  border-radius: 16px;
+/* Cartões táteis estilo Duolingo */
+.surface-card,
+.duo-card {
+  background-color: #ffffff;
+  border: 2px solid var(--na-border);
+  border-bottom-width: 4px;
+  border-radius: 20px;
 }
 
 .surface-sand {
   background-color: var(--na-sand);
-  border: 1px solid var(--na-sand-dark);
-  border-radius: 16px;
+  border: 2px solid var(--na-sand-dark);
+  border-radius: 18px;
+}
+
+/* Nó circular 3D da Trilha Sinuosa */
+.duo-path-node {
+  position: relative;
+  width: 78px;
+  height: 74px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 3px;
+  border-style: solid;
+  border-bottom-width: 9px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 100ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    border-bottom-width 100ms ease,
+    filter 140ms ease;
+}
+.duo-path-node:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+.duo-path-node:active:not(:disabled) {
+  transform: translateY(5px);
+  border-bottom-width: 4px;
 }
 
 /* Safe area helpers for iOS notch / Android gesture bar */
@@ -122,7 +266,137 @@
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 .safe-top {
-  padding-top: max(12px, env(safe-area-inset-top));
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* ============================================================================
+   ANIMAÇÕES DOS PERSONAGENS & TRILHA (GPU-accelerated: transform / opacity)
+   ============================================================================ */
+@keyframes na-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes na-hop {
+  0%,
+  100% {
+    transform: translateY(0px) scaleY(1);
+  }
+  35% {
+    transform: translateY(-13px) scaleY(1.06);
+  }
+  65% {
+    transform: translateY(0px) scaleY(0.94);
+  }
+}
+
+@keyframes na-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-14deg);
+  }
+}
+
+@keyframes na-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes na-callout-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0px);
+  }
+  50% {
+    transform: translate(-50%, -6px);
+  }
+}
+
+@keyframes na-chest-wiggle {
+  0%,
+  75%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  80% {
+    transform: rotate(-6deg) scale(1.06);
+  }
+  86% {
+    transform: rotate(6deg) scale(1.06);
+  }
+  92% {
+    transform: rotate(-4deg) scale(1.04);
+  }
+}
+
+@keyframes na-sparkle-pop {
+  0%,
+  100% {
+    transform: scale(0.75) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.18) rotate(16deg);
+    opacity: 1;
+  }
+}
+
+.animate-na-float {
+  animation: na-float 3s ease-in-out infinite;
+}
+.animate-na-hop {
+  animation: na-hop 0.85s ease-in-out infinite;
+}
+.animate-na-wave {
+  animation: na-wave 1.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: bottom center;
+}
+.animate-na-blink {
+  animation: na-blink 4.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.animate-na-callout {
+  animation: na-callout-bob 1.8s ease-in-out infinite;
+}
+.animate-na-chest {
+  animation: na-chest-wiggle 2.4s ease-in-out infinite;
+}
+.animate-na-sparkle {
+  animation: na-sparkle-pop 2.1s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Modo Calmo (Autismo & TDAH) + prefers-reduced-motion */
+html.calm-mode .animate-na-float,
+html.calm-mode .animate-na-hop,
+html.calm-mode .animate-na-wave,
+html.calm-mode .animate-na-callout,
+html.calm-mode .animate-na-chest,
+html.calm-mode .animate-na-sparkle {
+  animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,13 +3,14 @@ import { motion } from 'motion/react';
 import {
   ArrowsClockwise,
   Brain,
-  CheckCircle,
   SpeakerHigh,
 } from '@phosphor-icons/react';
 import { LANGUAGES, type FsrsRating, type LanguageCode } from '@naidioma/shared';
 import { api, type ReviewDeckItem } from '../lib/api';
 import { hapticSuccess, hapticTap } from '../lib/native';
+import { playCorrectSound, playTapSound } from '../lib/sound';
 import { speakText } from '../lib/speech';
+import { InteractiveCast, PuzzleMascot } from './Mascots';
 
 interface ReviewViewProps {
   language: LanguageCode;
@@ -65,10 +66,12 @@ export function ReviewView({ language, onXpUpdated }: ReviewViewProps) {
       await api.submitReview(current.id, language, rating);
       onXpUpdated();
       if (idx + 1 < cards.length) {
+        playTapSound();
         setIdx((i) => i + 1);
         setFlipped(false);
       } else {
         void hapticSuccess();
+        playCorrectSound(2);
         setSessionDone(true);
       }
     } finally {
@@ -84,40 +87,43 @@ export function ReviewView({ language, onXpUpdated }: ReviewViewProps) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--na-teal)] inline-flex items-center gap-1.5">
-            <Brain size={15} weight="duotone" />
-            Memória Científica FSRS-4.5 · {langMeta.namePt}
+      <div className="rounded-[24px] bg-[var(--na-success)] text-white p-5 border-2 border-[var(--na-success-dark)] border-b-[6px] flex items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="text-xs font-extrabold uppercase tracking-[0.15em] text-white/90 inline-flex items-center gap-1.5">
+            <Brain size={15} weight="fill" />
+            Memória Turbinada · {langMeta.namePt}
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl text-[var(--na-ink)] mt-1">
-            Revise na hora exata antes de esquecer
+          <h1 className="font-display text-2xl sm:text-3xl leading-tight">
+            Relembre palavras antes de esquecer!
           </h1>
+          <span className="inline-block font-mono-code text-xs font-extrabold px-3 py-1 rounded-full bg-white/20 mt-1">
+            {dueCount} cartões prontos
+          </span>
         </div>
-        <span className="font-mono-code text-xs font-bold px-3 py-1.5 rounded-full bg-[var(--na-sand)] text-[var(--na-burgundy)] shrink-0">
-          {dueCount} pendentes
-        </span>
+        <InteractiveCast character="bia" size={84} customPhrase="Sua memória é incrível! ⭐" />
       </div>
 
       {sessionDone || !current ? (
-        <div className="surface-card p-8 text-center space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--na-success-soft)] text-[var(--na-success)] flex items-center justify-center">
-            <CheckCircle size={30} weight="fill" />
+        <div className="duo-card p-8 text-center space-y-4">
+          <div className="flex justify-center">
+            <PuzzleMascot mood="celebrate" size={118} />
           </div>
           <h2 className="font-display text-3xl text-[var(--na-ink)]">
-            Memória blindada por hoje!
+            Memória blindada por hoje! 🎉
           </h2>
-          <p className="text-sm text-[var(--na-muted)] max-w-md mx-auto">
-            O algoritmo FSRS calculou o intervalo exato para cada expressão voltar quando você
-            estiver prestes a esquecer.
+          <p className="text-sm font-semibold text-[var(--na-muted)] max-w-md mx-auto">
+            O Puz salvou tudo! Suas palavras vão voltar na hora certinha para você nunca esquecer.
           </p>
           <button
             type="button"
-            onClick={() => void loadDeck()}
-            className="btn-tactile-secondary px-6 inline-flex items-center gap-2 text-sm"
+            onClick={() => {
+              playTapSound();
+              void loadDeck();
+            }}
+            className="duo-btn-teal px-6 inline-flex items-center gap-2 text-sm uppercase tracking-wide"
           >
             <ArrowsClockwise size={16} weight="bold" />
-            Fazer rodada extra de revisão
+            Fazer rodada extra
           </button>
         </div>
       ) : (

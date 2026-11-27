@@ -19,6 +19,7 @@ import {
 import { api } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
 import { createSpeechRecognizer, isSpeechRecognitionSupported, speakText } from '../lib/speech';
+import { InteractiveCast } from './Mascots';
 
 interface ConversationViewProps {
   language: LanguageCode;
@@ -146,18 +147,20 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
 
   if (!activeScenario) {
     return (
-      <div className="space-y-5 pb-8">
-        <div>
-          <div className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--na-burgundy)]">
-            Estúdio de Conversação por Voz IA · {langMeta.namePt}
+      <div className="max-w-3xl mx-auto space-y-5 pb-8">
+        <div className="rounded-[24px] bg-[var(--na-burgundy)] text-white p-5 border-2 border-[var(--na-wine-deep)] border-b-[6px] flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-extrabold uppercase tracking-[0.15em] text-[#ffd7e5]">
+              Bate-Papo por Voz IA · {langMeta.namePt}
+            </div>
+            <h1 className="font-display text-2xl sm:text-3xl leading-tight">
+              Converse sem vergonha com nossos personagens!
+            </h1>
+            <p className="text-xs sm:text-sm text-white/90 font-semibold max-w-xl">
+              Toque em uma história, fale no microfone (ou toque nas sugestões prontas) e ouça a resposta!
+            </p>
           </div>
-          <h1 className="font-display text-3xl sm:text-4xl text-[var(--na-ink)] mt-1">
-            Fale sem vergonha em situações reais
-          </h1>
-          <p className="text-sm text-[var(--na-muted)] mt-1 max-w-2xl">
-            Escolha um cenário abaixo. Você fala no microfone (ou digita) e recebe resposta ao vivo
-            com áudio nativo + correção de naturalidade em português.
-          </p>
+          <InteractiveCast character="leo" size={86} customPhrase="Vamos conversar juntos! 🎙️" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

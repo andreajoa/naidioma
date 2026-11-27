@@ -32,6 +32,8 @@ export const ExerciseTypeSchema = z.enum([
   'trap_buster',
   'dialogue_complete',
   'script_lab',
+  'picture_choice',
+  'match_pairs',
 ]);
 export type ExerciseType = z.infer<typeof ExerciseTypeSchema>;
 
@@ -60,8 +62,18 @@ export const ExerciseOptionSchema = z.object({
   text: z.string(),
   reading: z.string().optional(),
   translationPt: z.string().optional(),
+  emoji: z.string().optional(),
 });
 export type ExerciseOption = z.infer<typeof ExerciseOptionSchema>;
+
+export const MatchPairItemSchema = z.object({
+  id: z.string(),
+  left: z.string(),
+  leftReading: z.string().optional(),
+  right: z.string(),
+  emoji: z.string().optional(),
+});
+export type MatchPairItem = z.infer<typeof MatchPairItemSchema>;
 
 export const ExerciseSchema = z.object({
   id: z.string(),
@@ -69,6 +81,7 @@ export const ExerciseSchema = z.object({
   skill: SkillDimensionSchema,
   promptPt: z.string(),
   contextSituationPt: z.string().optional(),
+  illustrationEmoji: z.string().optional(),
   targetText: z.string(),
   reading: z.string().optional(),
   furiganaOrPinyin: z.string().optional(),
@@ -77,6 +90,7 @@ export const ExerciseSchema = z.object({
   brazilianTipPt: z.string(),
   options: z.array(ExerciseOptionSchema).optional(),
   correctOptionId: z.string().optional(),
+  pairs: z.array(MatchPairItemSchema).optional(),
   wordBank: z.array(z.string()).optional(),
   correctTokens: z.array(z.string()).optional(),
   dialogueLines: z

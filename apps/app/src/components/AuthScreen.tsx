@@ -1,23 +1,38 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import {
+  ArrowLeft,
   ArrowRight,
-  Check,
   EnvelopeSimple,
-  GlobeHemisphereWest,
   LockSimple,
-  Microphone,
-  Sparkle,
   User,
   WhatsappLogo,
 } from '@phosphor-icons/react';
-import { LANGUAGE_LIST, type LanguageCode } from '@naidioma/shared';
+import { LANGUAGES, type LanguageCode } from '@naidioma/shared';
 import { api, type UserProfile } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
+import { playCorrectSound, playGentleRetrySound, playTapSound } from '../lib/sound';
+import { speakText } from '../lib/speech';
+import { LANGUAGE_FLAGS, PuzzleMascot } from './Mascots';
 
 interface AuthScreenProps {
   onAuthenticated: (user: UserProfile) => void;
 }
+
+type AuthStep = 'welcome' | 'language' | 'register' | 'login';
+
+const ORDERED_LANGUAGES: LanguageCode[] = ['ko', 'en', 'ja', 'es', 'fr', 'de', 'it', 'zh'];
+
+const GREETING_BY_LANG: Record<LanguageCode, string> = {
+  ko: '안녕하세요!',
+  en: 'Hello!',
+  ja: 'こんにちは!',
+  es: '¡Hola!',
+  fr: 'Bonjour!',
+  de: 'Hallo!',
+  it: 'Ciao!',
+  zh: '你好!',
+};
 
 function readUrlMarketingParams(): { leadSource: string; utmCampaign?: string } {
   if (typeof window === 'undefined') return { leadSource: 'nucleoafetar' };
@@ -28,8 +43,8 @@ function readUrlMarketingParams(): { leadSource: string; utmCampaign?: string } 
 }
 
 export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
-  const [mode, setMode] = useState<'register' | 'login'>('register');
-  const [selectedLang, setSelectedLang] = useState<LanguageCode>('en');
+  const [step, setStep] = useState<AuthStep>('welcome');
+  const [selectedLang, setSelectedLang] = useState<LanguageCode>('ko');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -44,9 +59,10 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setError(null);
     setLoading(true);
     void hapticTap();
+    playTapSound();
 
     try {
-      if (mode === 'register') {
+      if (step === 'register') {
         const { leadSource, utmCampaign } = readUrlMarketingParams();
         const user = await api.register({
           displayName,
@@ -60,373 +76,439 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           utmCampaign,
         });
         void hapticSuccess();
+        playCorrectSound(2);
         onAuthenticated(user);
       } else {
         const user = await api.login({ email, password });
         void hapticSuccess();
+        playCorrectSound(2);
         onAuthenticated(user);
       }
     } catch (err) {
       void hapticError();
+      playGentleRetrySound();
       setError(err instanceof Error ? err.message : 'Não foi possível concluir o acesso.');
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <div className="min-h-[100dvh] bg-[var(--na-cream)] text-[var(--na-ink)] flex flex-col">
-      {/* Top editorial bar */}
-      <header className="w-full border-b border-[var(--na-border)] bg-[var(--na-cream)] safe-top">
-        <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[11px] bg-[var(--na-wine)] text-[var(--na-cream)] flex items-center justify-center font-display text-xl font-semibold border border-[var(--na-gold)]/50">
-              NA
-            </div>
-            <div className="leading-tight">
-              <div className="font-display text-2xl font-semibold tracking-tight text-[var(--na-wine)]">
+  // PASSO 1: Abertura estilo Duolingo com o mascote Quebra-Cabeça (Puz)
+  if (step === 'welcome') {
+    return (
+      <div className="min-h-[100dvh] bg-[var(--na-cream)] flex flex-col justify-between px-5 py-8 safe-top safe-bottom">
+        <div className="max-w-lg w-full mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-[var(--na-burgundy)] text-white font-display text-lg border-b-4 border-[var(--na-wine-deep)]">
+              🧩
+            </span>
+            <div>
+              <div className="font-display text-2xl text-[var(--na-burgundy)] leading-none">
                 NAidioma
               </div>
-              <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-[var(--na-teal)]">
-                Núcleo Afetar · Idiomas
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--na-teal)] mt-0.5">
+                Núcleo Afetar
               </div>
             </div>
           </div>
+
+          <span className="px-3 py-1 rounded-full bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] text-[11px] font-extrabold text-[#7a5200]">
+            100% GRÁTIS
+          </span>
+        </div>
+
+        <motion.main
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+          className="max-w-md w-full mx-auto flex flex-col items-center text-center my-auto py-8"
+        >
+          {/* Balão animado do Puz */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1 }}
+            className="relative mb-3 px-5 py-2.5 rounded-2xl bg-white border-2 border-[var(--na-border)] shadow-xs text-sm font-extrabold text-[var(--na-ink)]"
+          >
+            Oi! Eu sou o Puz! Vamos aprender brincando? 🧩
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-r-2 border-b-2 border-[var(--na-border)] rotate-45" />
+          </motion.div>
+
+          <PuzzleMascot mood="wave" size={184} />
+
+          <h1 className="font-display text-3xl sm:text-4xl text-[var(--na-ink)] leading-tight mt-2">
+            O jeito divertido de aprender idiomas!
+          </h1>
+          <p className="text-sm sm:text-base font-medium text-[var(--na-muted)] mt-2.5 max-w-sm leading-relaxed">
+            Feito para crianças e adultos: trilha com desafios rápidos, letras que falam,
+            personagens animados e modo offline.
+          </p>
+
+          {/* Mini fila de bandeiras */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+            {ORDERED_LANGUAGES.map((code) => (
+              <span
+                key={code}
+                className="px-2.5 py-1 rounded-full bg-white border-2 border-[var(--na-border)] text-xs font-extrabold text-[var(--na-ink)] inline-flex items-center gap-1"
+              >
+                <span>{LANGUAGE_FLAGS[code].emoji}</span>
+                <span>{LANGUAGE_FLAGS[code].shortName}</span>
+              </span>
+            ))}
+          </div>
+        </motion.main>
+
+        {/* Botões gigantes 3D estilo Duolingo */}
+        <div className="max-w-md w-full mx-auto space-y-3">
+          <button
+            type="button"
+            onClick={() => {
+              void hapticTap();
+              playCorrectSound(1);
+              setStep('language');
+            }}
+            className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
+          >
+            COMEÇAR AGORA
+            <ArrowRight size={20} weight="bold" />
+          </button>
 
           <button
             type="button"
             onClick={() => {
               void hapticTap();
+              playTapSound();
               setError(null);
-              setMode(mode === 'register' ? 'login' : 'register');
+              setStep('login');
             }}
-            className="text-sm font-semibold text-[var(--na-burgundy)] hover:text-[var(--na-wine-deep)] px-3 py-2 rounded-lg"
+            className="duo-btn-white w-full text-base uppercase tracking-wide text-[var(--na-teal)]"
           >
-            {mode === 'register' ? 'Já tenho conta' : 'Criar conta grátis'}
+            JÁ TENHO CONTA
           </button>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-5 py-8 md:py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-        {/* Left editorial column */}
-        <motion.section
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-          className="lg:col-span-6 space-y-6"
-        >
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--na-sand)] border border-[var(--na-sand-dark)] text-xs font-bold tracking-wider uppercase text-[var(--na-burgundy)]">
-            <Sparkle size={14} weight="fill" />
-            Acesso Gratuito · 8 Idiomas Completos
+  // PASSO 2: Escolha do idioma com bandeiras grandes e áudio instantâneo
+  if (step === 'language') {
+    return (
+      <div className="min-h-[100dvh] bg-[var(--na-cream)] flex flex-col justify-between px-5 py-6 safe-top safe-bottom">
+        <div className="max-w-xl w-full mx-auto">
+          <div className="flex items-center gap-3 mb-5">
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                setStep('welcome');
+              }}
+              aria-label="Voltar"
+              className="w-11 h-11 rounded-2xl bg-white border-2 border-[var(--na-border)] border-b-4 flex items-center justify-center text-[var(--na-ink)]"
+            >
+              <ArrowLeft size={20} weight="bold" />
+            </button>
+            <div className="flex-1 h-4 rounded-full bg-[var(--na-sand-dark)] overflow-hidden p-0.5">
+              <div className="h-full w-1/2 rounded-full bg-[var(--na-success)] transition-all duration-300" />
+            </div>
           </div>
 
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-[56px] leading-[1.06] tracking-tight text-[var(--na-ink)]">
-            Fale idiomas com{' '}
-            <em className="italic text-[var(--na-burgundy)] font-normal">
-              naturalidade real
-            </em>
-            , sem travar.
-          </h1>
-
-          <p className="text-[15px] leading-relaxed text-[var(--na-muted)] max-w-xl">
-            Criado para destravar brasileiros desde a primeira semana: conversação por voz com IA,
-            revisão científica FSRS e foco direto nas armadilhas entre o português e o mundo.
-          </p>
-
-          {/* Language quick picker preview */}
-          <div className="space-y-3 pt-1">
-            <div className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--na-muted)]">
-              Escolha por qual idioma começar agora:
+          <div className="flex items-center gap-3 mb-6">
+            <PuzzleMascot mood="happy" size={84} className="shrink-0" />
+            <div className="relative flex-1 p-4 rounded-2xl bg-white border-2 border-[var(--na-border)] text-sm sm:text-base font-extrabold text-[var(--na-ink)]">
+              Qual idioma você quer aprender primeiro?
+              <span className="block text-xs font-semibold text-[var(--na-muted)] mt-0.5">
+                Você pode trocar ou estudar todos os 8 quando quiser!
+              </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {LANGUAGE_LIST.map((lang) => {
-                const active = selectedLang === lang.code;
-                return (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => {
-                      void hapticTap();
-                      setSelectedLang(lang.code);
-                    }}
-                    className={`min-h-[54px] px-3 py-2.5 rounded-[14px] border text-left transition-all flex flex-col justify-center ${
-                      active
-                        ? 'bg-[var(--na-wine)] text-[var(--na-ivory)] border-[var(--na-wine-deep)] shadow-sm'
-                        : 'bg-[var(--na-ivory)] text-[var(--na-ink)] border-[var(--na-border)] hover:border-[var(--na-gold)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-mono-code text-[11px] font-bold opacity-80">
-                        {lang.isoBadge}
-                      </span>
-                      {lang.flagship && (
-                        <span
-                          className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
-                            active
-                              ? 'bg-[var(--na-gold)] text-[var(--na-wine-deep)]'
-                              : 'bg-[var(--na-sand)] text-[var(--na-burgundy)]'
-                          }`}
-                        >
-                          Destaque
-                        </span>
-                      )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {ORDERED_LANGUAGES.map((code) => {
+              const meta = LANGUAGES[code];
+              const flag = LANGUAGE_FLAGS[code];
+              const active = selectedLang === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => {
+                    void hapticTap();
+                    playTapSound();
+                    setSelectedLang(code);
+                    speakText(GREETING_BY_LANG[code], code, 0.95);
+                  }}
+                  className={`p-4 rounded-2xl border-2 border-b-[5px] text-left transition-all flex items-center gap-3 active:translate-y-[2px] ${
+                    active
+                      ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                      : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-gold)]'
+                  }`}
+                >
+                  <span className="text-3xl leading-none shrink-0" role="img" aria-label={flag.shortName}>
+                    {flag.emoji}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="font-extrabold text-base leading-tight truncate">
+                      {flag.shortName}
                     </div>
-                    <span className="text-[13px] font-bold leading-tight mt-0.5 truncate">
-                      {lang.code === 'en' ? 'Inglês BR' : lang.namePt.split(' ')[0]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 3 concrete differentiators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className="surface-sand p-4 space-y-1.5">
-              <Microphone size={20} weight="duotone" className="text-[var(--na-burgundy)]" />
-              <div className="text-sm font-bold text-[var(--na-ink)]">Voz IA ao vivo</div>
-              <p className="text-xs text-[var(--na-muted)] leading-relaxed">
-                Treine diálogos reais e receba correção clara em português.
-              </p>
-            </div>
-            <div className="surface-sand p-4 space-y-1.5">
-              <GlobeHemisphereWest size={20} weight="duotone" className="text-[var(--na-teal)]" />
-              <div className="text-sm font-bold text-[var(--na-ink)]">Escrita & Tons</div>
-              <p className="text-xs text-[var(--na-muted)] leading-relaxed">
-                Furigana, Pinyin e Hangul ligáveis com um toque.
-              </p>
-            </div>
-            <div className="surface-sand p-4 space-y-1.5">
-              <Check size={20} weight="bold" className="text-[var(--na-success)]" />
-              <div className="text-sm font-bold text-[var(--na-ink)]">Zero "vidas"</div>
-              <p className="text-xs text-[var(--na-muted)] leading-relaxed">
-                Estude no seu ritmo, sem travas irritantes por errar.
-              </p>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Right card: Mandatory signup for mailing + progress sync */}
-        <motion.section
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.06 }}
-          className="lg:col-span-6 w-full"
-        >
-          <div className="surface-card p-6 sm:p-8 shadow-sm">
-            {/* Mode switch tabs */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-[12px] bg-[var(--na-sand)] mb-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setMode('register');
-                }}
-                className={`min-h-[44px] rounded-[10px] text-sm font-bold transition-all ${
-                  mode === 'register'
-                    ? 'bg-[var(--na-ivory)] text-[var(--na-wine)] shadow-xs'
-                    : 'text-[var(--na-muted)]'
-                }`}
-              >
-                Criar conta grátis
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setMode('login');
-                }}
-                className={`min-h-[44px] rounded-[10px] text-sm font-bold transition-all ${
-                  mode === 'login'
-                    ? 'bg-[var(--na-ivory)] text-[var(--na-wine)] shadow-xs'
-                    : 'text-[var(--na-muted)]'
-                }`}
-              >
-                Entrar
-              </button>
-            </div>
-
-            <div className="mb-5">
-              <h2 className="font-display text-3xl text-[var(--na-ink)] leading-tight">
-                {mode === 'register'
-                  ? 'Comece gratuitamente agora'
-                  : 'Que bom ter você de volta'}
-              </h2>
-              <p className="text-sm text-[var(--na-muted)] mt-1">
-                {mode === 'register'
-                  ? 'Cadastre seu e-mail para liberar todos os 8 idiomas gratuitamente e salvar seu progresso em qualquer aparelho.'
-                  : 'Entre com seu e-mail e senha para retomar sua ofensiva.'}
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'register' && (
-                <div>
-                  <label
-                    htmlFor="na-name"
-                    className="block text-xs font-bold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
-                  >
-                    Seu nome completo
-                  </label>
-                  <div className="relative">
-                    <User
-                      size={18}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
-                    />
-                    <input
-                      id="na-name"
-                      type="text"
-                      required
-                      minLength={2}
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Ex.: Mariana Souza"
-                      className="w-full min-h-[48px] pl-10 pr-4 rounded-[12px] bg-[var(--na-cream)] border border-[var(--na-border)] text-[var(--na-ink)] placeholder:text-[var(--na-muted)]/70 focus:border-[var(--na-teal)]"
-                    />
+                    <div className="text-xs font-bold opacity-75 truncate mt-0.5">
+                      {meta.nativeName}
+                    </div>
                   </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="max-w-xl w-full mx-auto pt-6">
+          <button
+            type="button"
+            onClick={() => {
+              void hapticTap();
+              playCorrectSound(1);
+              setStep('register');
+            }}
+            className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
+          >
+            CONTINUAR COM {LANGUAGE_FLAGS[selectedLang].shortName.toUpperCase()}{' '}
+            {LANGUAGE_FLAGS[selectedLang].emoji}
+            <ArrowRight size={20} weight="bold" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // PASSO 3: Criar perfil rápido ou Entrar (com cadastro obrigatório para salvar progresso + LGPD)
+  const isRegister = step === 'register';
+
+  return (
+    <div className="min-h-[100dvh] bg-[var(--na-cream)] flex flex-col px-5 py-6 safe-top safe-bottom">
+      <div className="max-w-md w-full mx-auto flex-1 flex flex-col justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-5">
+            <button
+              type="button"
+              onClick={() => {
+                playTapSound();
+                setError(null);
+                setStep(isRegister ? 'language' : 'welcome');
+              }}
+              aria-label="Voltar"
+              className="w-11 h-11 rounded-2xl bg-white border-2 border-[var(--na-border)] border-b-4 flex items-center justify-center text-[var(--na-ink)]"
+            >
+              <ArrowLeft size={20} weight="bold" />
+            </button>
+            <div className="flex-1 h-4 rounded-full bg-[var(--na-sand-dark)] overflow-hidden p-0.5">
+              <div className="h-full w-full rounded-full bg-[var(--na-success)] transition-all duration-300" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-5">
+            <PuzzleMascot mood={isRegister ? 'celebrate' : 'wave'} size={78} className="shrink-0" />
+            <div className="flex-1 p-3.5 rounded-2xl bg-white border-2 border-[var(--na-border)]">
+              <div className="font-extrabold text-sm text-[var(--na-ink)] leading-snug">
+                {isRegister
+                  ? `Crie seu perfil grátis para começar ${LANGUAGE_FLAGS[selectedLang].shortName} ${LANGUAGE_FLAGS[selectedLang].emoji}`
+                  : 'Que bom te ver de volta! Vamos continuar a trilha?'}
+              </div>
+              {isRegister && (
+                <div className="text-[11px] font-semibold text-[var(--na-muted)] mt-0.5">
+                  Pais podem colocar seu e-mail para salvar o progresso da criança na nuvem.
                 </div>
               )}
+            </div>
+          </div>
 
+          <form onSubmit={handleSubmit} className="duo-card p-5 space-y-4">
+            {isRegister && (
               <div>
                 <label
-                  htmlFor="na-email"
-                  className="block text-xs font-bold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
+                  htmlFor="na-name"
+                  className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
                 >
-                  E-mail
+                  Nome do aluno (ou apelido)
                 </label>
                 <div className="relative">
-                  <EnvelopeSimple
+                  <User
                     size={18}
+                    weight="bold"
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
                   />
                   <input
-                    id="na-email"
-                    type="email"
+                    id="na-name"
+                    type="text"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="voce@email.com.br"
-                    className="w-full min-h-[48px] pl-10 pr-4 rounded-[12px] bg-[var(--na-cream)] border border-[var(--na-border)] text-[var(--na-ink)] placeholder:text-[var(--na-muted)]/70 focus:border-[var(--na-teal)]"
+                    minLength={2}
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Ex.: Lucas ou Sofia"
+                    className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
                   />
                 </div>
               </div>
+            )}
 
-              {mode === 'register' && (
-                <div>
-                  <label
-                    htmlFor="na-whatsapp"
-                    className="block text-xs font-bold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
-                  >
-                    WhatsApp <span className="font-normal text-[var(--na-muted)]">(opcional)</span>
-                  </label>
-                  <div className="relative">
-                    <WhatsappLogo
-                      size={18}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
-                    />
-                    <input
-                      id="na-whatsapp"
-                      type="tel"
-                      value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
-                      placeholder="(13) 99999-0000"
-                      className="w-full min-h-[48px] pl-10 pr-4 rounded-[12px] bg-[var(--na-cream)] border border-[var(--na-border)] text-[var(--na-ink)] placeholder:text-[var(--na-muted)]/70 focus:border-[var(--na-teal)]"
-                    />
-                  </div>
-                </div>
-              )}
+            <div>
+              <label
+                htmlFor="na-email"
+                className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
+              >
+                E-mail {isRegister ? '(do aluno ou responsável)' : ''}
+              </label>
+              <div className="relative">
+                <EnvelopeSimple
+                  size={18}
+                  weight="bold"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
+                />
+                <input
+                  id="na-email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="voce@email.com.br"
+                  className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
+                />
+              </div>
+            </div>
 
+            {isRegister && (
               <div>
                 <label
-                  htmlFor="na-password"
-                  className="block text-xs font-bold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
+                  htmlFor="na-whatsapp"
+                  className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
                 >
-                  Senha
+                  WhatsApp <span className="font-semibold text-[var(--na-muted)]">(opcional)</span>
                 </label>
                 <div className="relative">
-                  <LockSimple
+                  <WhatsappLogo
                     size={18}
+                    weight="bold"
                     className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
                   />
                   <input
-                    id="na-password"
-                    type="password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mínimo 6 caracteres"
-                    className="w-full min-h-[48px] pl-10 pr-4 rounded-[12px] bg-[var(--na-cream)] border border-[var(--na-border)] text-[var(--na-ink)] placeholder:text-[var(--na-muted)]/70 focus:border-[var(--na-teal)]"
+                    id="na-whatsapp"
+                    type="tel"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="(13) 99999-0000"
+                    className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
                   />
                 </div>
               </div>
+            )}
 
-              {mode === 'register' && (
-                <>
-                  <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-[var(--na-ink)] mb-1.5">
-                      Meta diária confortável
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[5, 10, 15].map((min) => (
-                        <button
-                          key={min}
-                          type="button"
-                          onClick={() => setDailyGoalMinutes(min)}
-                          className={`min-h-[44px] rounded-[11px] border text-sm font-bold transition-colors ${
-                            dailyGoalMinutes === min
-                              ? 'bg-[var(--na-sand)] border-[var(--na-burgundy)] text-[var(--na-wine)]'
-                              : 'bg-[var(--na-cream)] border-[var(--na-border)] text-[var(--na-muted)]'
-                          }`}
-                        >
-                          {min} min/dia
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <label className="flex items-start gap-3 text-xs text-[var(--na-muted)] leading-relaxed pt-1 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={marketingOptIn}
-                      onChange={(e) => setMarketingOptIn(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 accent-[var(--na-burgundy)] shrink-0"
-                    />
-                    <span>
-                      Aceito receber novidades, dicas de estudo e comunicados do{' '}
-                      <strong className="text-[var(--na-ink)]">NAidioma</strong> e do{' '}
-                      <strong className="text-[var(--na-ink)]">Núcleo Afetar</strong> por e-mail
-                      (você pode cancelar quando quiser — LGPD).
-                    </span>
-                  </label>
-                </>
-              )}
-
-              {error && (
-                <div
-                  role="alert"
-                  className="p-3.5 rounded-[12px] bg-[var(--na-error-soft)] border border-[var(--na-error)]/30 text-sm font-medium text-[var(--na-error)]"
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-tactile-primary w-full flex items-center justify-center gap-2 text-base mt-2"
+            <div>
+              <label
+                htmlFor="na-password"
+                className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
               >
-                {loading
-                  ? 'Preparando sua trilha...'
-                  : mode === 'register'
-                    ? 'Criar conta e estudar grátis'
-                    : 'Entrar no NAidioma'}
-                {!loading && <ArrowRight size={18} weight="bold" />}
-              </button>
-            </form>
-          </div>
-        </motion.section>
-      </main>
+                Senha
+              </label>
+              <div className="relative">
+                <LockSimple
+                  size={18}
+                  weight="bold"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
+                />
+                <input
+                  id="na-password"
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
+                />
+              </div>
+            </div>
+
+            {isRegister && (
+              <>
+                <div>
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5">
+                    Meta divertida por dia
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { min: 5, label: '5 min', tag: '🌱 Leve' },
+                      { min: 10, label: '10 min', tag: '🚀 Legal' },
+                      { min: 15, label: '15 min', tag: '🔥 Turbo' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.min}
+                        type="button"
+                        onClick={() => {
+                          playTapSound();
+                          setDailyGoalMinutes(opt.min);
+                        }}
+                        className={`p-2.5 rounded-2xl border-2 border-b-4 text-center transition-all ${
+                          dailyGoalMinutes === opt.min
+                            ? 'bg-[var(--na-gold-soft)] border-[var(--na-gold)] text-[#7a5200]'
+                            : 'bg-[var(--na-cream)] border-[var(--na-border)] text-[var(--na-muted)]'
+                        }`}
+                      >
+                        <div className="text-sm font-extrabold">{opt.label}</div>
+                        <div className="text-[11px] font-bold">{opt.tag}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-2.5 text-xs text-[var(--na-muted)] leading-relaxed cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={marketingOptIn}
+                    onChange={(e) => setMarketingOptIn(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[var(--na-burgundy)] shrink-0"
+                  />
+                  <span>
+                    Aceito receber novidades e dicas do <strong className="text-[var(--na-ink)]">NAidioma</strong>{' '}
+                    e do <strong className="text-[var(--na-ink)]">Núcleo Afetar</strong> por e-mail (LGPD).
+                  </span>
+                </label>
+              </>
+            )}
+
+            {error && (
+              <div
+                role="alert"
+                className="p-3 rounded-2xl bg-[var(--na-error-soft)] border-2 border-[var(--na-error)]/40 text-sm font-bold text-[var(--na-error)]"
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
+            >
+              {loading
+                ? 'Preparando sua trilha...'
+                : isRegister
+                  ? 'CRIAR CONTA E COMEÇAR!'
+                  : 'ENTRAR NO NAIDIOMA'}
+              {!loading && <ArrowRight size={20} weight="bold" />}
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              setError(null);
+              setStep(isRegister ? 'login' : 'language');
+            }}
+            className="w-full mt-4 py-2 text-sm font-extrabold text-[var(--na-teal)]"
+          >
+            {isRegister ? 'Já tenho conta → Entrar' : 'Ainda não tem conta? Criar grátis'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

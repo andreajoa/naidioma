@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  DeviceMobile,
-  DownloadSimple,
-  Export,
-  PlusSquare,
-  X,
-} from '@phosphor-icons/react';
+import { DownloadSimple, Export, PlusSquare, X } from '@phosphor-icons/react';
 import { hapticSuccess, hapticTap, isNativeMobile } from '../lib/native';
+import { playCorrectSound, playTapSound } from '../lib/sound';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -60,6 +55,7 @@ export function InstallAppBanner() {
       setStandalone(true);
       setInstalledToast(true);
       void hapticSuccess();
+      playCorrectSound(2);
       setTimeout(() => setInstalledToast(false), 4000);
     };
 
@@ -73,20 +69,20 @@ export function InstallAppBanner() {
 
   if (installedToast) {
     return (
-      <div className="bg-[var(--na-success)] text-white px-4 py-2.5 text-xs font-bold text-center">
-        NAidioma instalado na sua tela inicial! Agora funciona até offline.
+      <div className="bg-[var(--na-success)] text-white px-4 py-2.5 text-xs font-extrabold text-center">
+        🧩 NAidioma instalado na tela inicial! Agora funciona até sem internet.
       </div>
     );
   }
 
   if (standalone || dismissed) return null;
 
-  // Show on Android/Desktop when native 1-click prompt is ready, OR on iPhone/iPad Safari
   const canInstallOneClick = Boolean(deferredPrompt);
   if (!canInstallOneClick && !ios) return null;
 
   async function handleOneClickInstall() {
     void hapticTap();
+    playTapSound();
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
@@ -107,20 +103,20 @@ export function InstallAppBanner() {
 
   return (
     <>
-      <div className="bg-[var(--na-sand)] border-b border-[var(--na-sand-dark)] px-4 py-2.5">
+      <div className="bg-[var(--na-gold-soft)] border-b-2 border-[var(--na-gold)] px-4 py-2.5">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-[10px] bg-[var(--na-wine)] text-[var(--na-cream)] flex items-center justify-center shrink-0">
-              <DeviceMobile size={18} weight="duotone" />
+            <div className="w-10 h-10 rounded-2xl bg-[var(--na-burgundy)] text-white border-b-4 border-[var(--na-wine-deep)] flex items-center justify-center text-lg shrink-0">
+              🧩
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-extrabold text-[var(--na-wine)] leading-tight">
-                Baixar app NAidioma (funciona offline)
+              <div className="text-xs font-extrabold text-[#5a3b00] leading-tight">
+                Baixar app NAidioma (funciona offline!)
               </div>
-              <div className="text-[11px] text-[var(--na-muted)] truncate">
+              <div className="text-[11px] font-bold text-[#8a6010] truncate">
                 {canInstallOneClick
-                  ? 'Instale na tela inicial em 1 clique — grátis e sem ocupar espaço.'
-                  : 'Adicione à tela inicial do iPhone em 2 toques rápidos.'}
+                  ? 'Instale na tela inicial em 1 clique.'
+                  : 'Coloque no iPhone em 2 toques bem fáceis.'}
               </div>
             </div>
           </div>
@@ -129,71 +125,70 @@ export function InstallAppBanner() {
             <button
               type="button"
               onClick={() => void handleOneClickInstall()}
-              className="min-h-[44px] px-4 rounded-full bg-[var(--na-burgundy)] text-[var(--na-ivory)] text-xs font-bold inline-flex items-center gap-1.5"
+              className="min-h-[42px] px-4 rounded-2xl bg-[var(--na-burgundy)] text-white border-2 border-[var(--na-wine-deep)] border-b-4 text-xs font-extrabold inline-flex items-center gap-1.5 active:translate-y-[2px]"
             >
-              <DownloadSimple size={14} weight="bold" />
-              {canInstallOneClick ? 'Instalar agora' : 'Instalar no iPhone'}
+              <DownloadSimple size={15} weight="bold" />
+              {canInstallOneClick ? 'Instalar' : 'Instalar no iPhone'}
             </button>
             <button
               type="button"
               onClick={handleDismiss}
-              aria-label="Dispensar aviso de instalação"
-              className="w-11 h-11 rounded-full flex items-center justify-center text-[var(--na-muted)]"
+              aria-label="Fechar aviso"
+              className="w-10 h-10 rounded-full flex items-center justify-center text-[#7a5200]"
             >
-              <X size={15} weight="bold" />
+              <X size={16} weight="bold" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Ultra-simple visual 2-step guide specifically for iPhone Safari (Apple policy requires Share -> Add to Home Screen) */}
       {iosGuideOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="surface-card w-full sm:max-w-md rounded-b-none sm:rounded-[20px] p-6 space-y-5 safe-bottom">
+          <div className="duo-card w-full sm:max-w-md rounded-b-none sm:rounded-[24px] p-6 space-y-5 safe-bottom">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--na-burgundy)]">
-                  Instalação rápida no iPhone
+                <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-burgundy)]">
+                  Instalar no iPhone / iPad
                 </div>
                 <h3 className="font-display text-2xl text-[var(--na-ink)] mt-0.5">
-                  Coloque o NAidioma na sua tela inicial
+                  Coloque o NAidioma na tela inicial 🧩
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIosGuideOpen(false)}
                 aria-label="Fechar"
-                className="w-9 h-9 rounded-[10px] border border-[var(--na-border)] flex items-center justify-center"
+                className="w-9 h-9 rounded-xl border-2 border-[var(--na-border)] flex items-center justify-center"
               >
                 <X size={16} weight="bold" />
               </button>
             </div>
 
             <div className="space-y-3">
-              <div className="p-4 rounded-[14px] bg-[var(--na-cream)] border border-[var(--na-border)] flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-[12px] bg-[var(--na-teal)]/15 text-[var(--na-teal)] flex items-center justify-center shrink-0">
+              <div className="p-4 rounded-2xl bg-[var(--na-teal-soft)] border-2 border-[var(--na-teal)] flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-[var(--na-teal)] text-white flex items-center justify-center shrink-0">
                   <Export size={22} weight="bold" />
                 </div>
                 <div className="text-xs leading-relaxed">
-                  <div className="font-extrabold text-[var(--na-ink)] text-sm">
+                  <div className="font-extrabold text-[var(--na-teal-dark)] text-sm">
                     1. Toque em Compartilhar
                   </div>
-                  <div className="text-[var(--na-muted)]">
-                    No ícone de quadradinho com seta para cima na barra inferior do Safari.
+                  <div className="font-semibold text-[var(--na-ink)]">
+                    No quadradinho com seta para cima na barra de baixo do Safari.
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-[14px] bg-[var(--na-cream)] border border-[var(--na-border)] flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-[12px] bg-[var(--na-burgundy)]/15 text-[var(--na-burgundy)] flex items-center justify-center shrink-0">
+              <div className="p-4 rounded-2xl bg-[var(--na-rose-soft)] border-2 border-[var(--na-burgundy)] flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-[var(--na-burgundy)] text-white flex items-center justify-center shrink-0">
                   <PlusSquare size={22} weight="bold" />
                 </div>
                 <div className="text-xs leading-relaxed">
-                  <div className="font-extrabold text-[var(--na-ink)] text-sm">
+                  <div className="font-extrabold text-[var(--na-wine-deep)] text-sm">
                     2. Toque em “Adicionar à Tela de Início”
                   </div>
-                  <div className="text-[var(--na-muted)]">
-                    Pronto! O ícone do NAidioma aparece como aplicativo real e funciona até offline.
+                  <div className="font-semibold text-[var(--na-ink)]">
+                    Pronto! O quebra-cabeça do NAidioma vira app e funciona offline.
                   </div>
                 </div>
               </div>
@@ -202,9 +197,9 @@ export function InstallAppBanner() {
             <button
               type="button"
               onClick={() => setIosGuideOpen(false)}
-              className="btn-tactile-primary w-full text-sm"
+              className="duo-btn-emerald w-full text-sm uppercase tracking-wide"
             >
-              Entendi, vou adicionar agora
+              ENTENDI, VOU ADICIONAR AGORA!
             </button>
           </div>
         </div>
