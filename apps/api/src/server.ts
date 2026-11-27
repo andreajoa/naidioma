@@ -13,11 +13,13 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerBillingRoutes } from './routes/billing.js';
 import { registerCourseRoutes } from './routes/courses.js';
 import { registerFeedbackAndAdminRoutes } from './routes/feedback-admin.js';
+import { registerPushRoutes } from './routes/push.js';
 import {
   getCloudSyncStatus,
   pushDatabaseToCloudflare,
   scheduleCloudSync,
 } from './services/cloud-sync.js';
+import { sendDailyStudyReminders } from './services/push.js';
 import { getRuntimeSettings } from './services/runtime-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +105,10 @@ export async function buildServer() {
     return pushDatabaseToCloudflare();
   });
 
+  app.get('/api/cron/daily-reminders', async () => {
+    return sendDailyStudyReminders();
+  });
+
   // Automatically replicate every successful write mutation to Cloudflare (NexaCloud Private KV)
   app.addHook('onResponse', (req, reply, done) => {
     if (
@@ -124,6 +130,7 @@ export async function buildServer() {
   await registerAiRoutes(app);
   await registerBillingRoutes(app);
   await registerFeedbackAndAdminRoutes(app);
+  await registerPushRoutes(app);
 
   // Unified NexaCloud production hosting: serve compiled Web App / PWA on same port
   const webDistDir = path.resolve(__dirname, '../../app/dist');
@@ -135,6 +142,7 @@ export async function buildServer() {
       setHeaders: (res, filePath) => {
         if (
           filePath.endsWith('sw.js') ||
+          filePath.endsWith('push-sw.js') ||
           filePath.endsWith('registerSW.js') ||
           filePath.endsWith('manifest.webmanifest') ||
           filePath.endsWith('index.html')

@@ -549,6 +549,7 @@ export function App() {
               {tab === 'profile' && (
                 <ProfileView
                   user={user}
+                  petName={pet.name}
                   billing={billing}
                   onUserUpdated={setUser}
                   onOpenBilling={() => setBillingModalOpen(true)}

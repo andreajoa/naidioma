@@ -5,7 +5,7 @@ import { hapticTap } from '../lib/native';
 import { playCharacterCheerSound } from '../lib/sound';
 
 export type MascotMood = 'idle' | 'wave' | 'happy' | 'celebrate' | 'encourage' | 'listening';
-export type CastId = 'puz' | 'leo' | 'bia' | 'mochi';
+export type CastId = 'puz' | 'dino' | 'leo' | 'bia' | 'mochi';
 
 interface PuzzleMascotProps {
   mood?: MascotMood;
@@ -313,8 +313,61 @@ function MochiCharacter({ size = 96, excited = false }: { size?: number; excited
   );
 }
 
+/**
+ * DINO — Dinossaurinho animado super carinhoso que adora ensinar idiomas e pular na trilha!
+ */
+function DinoCharacter({ size = 96, excited = false }: { size?: number; excited?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 150 146"
+      width={size}
+      height={size}
+      className={`overflow-visible ${excited ? 'animate-na-hop' : 'animate-na-float'}`}
+      aria-hidden="true"
+    >
+      <ellipse cx="72" cy="134" rx="34" ry="7.5" fill="#1D8A45" opacity="0.18" />
+      {/* Rabinho abanando */}
+      <path
+        d="M104 98 C126 104 140 90 136 74 C127 81 118 84 106 84 Z"
+        fill="#2CB65E"
+        stroke="#1D8A45"
+        strokeWidth="3.5"
+        strokeLinejoin="round"
+        className="animate-na-wave"
+      />
+      {/* Cristas coloridas */}
+      <polygon points="50,36 60,18 70,34" fill="#F4B400" stroke="#C98A00" strokeWidth="2.5" strokeLinejoin="round" />
+      <polygon points="68,32 79,14 90,33" fill="#C12B5B" stroke="#7A1436" strokeWidth="2.5" strokeLinejoin="round" />
+      <polygon points="88,38 100,24 106,44" fill="#1496B0" stroke="#0C6F84" strokeWidth="2.5" strokeLinejoin="round" />
+      {/* Pezinhos */}
+      <rect x="48" y="112" width="18" height="20" rx="9" fill="#1D8A45" />
+      <rect x="80" y="112" width="18" height="20" rx="9" fill="#1D8A45" />
+      {/* Bracinho acenando */}
+      <g className="animate-na-wave">
+        <path d="M36 86 C20 78 18 64 26 56" stroke="#1D8A45" strokeWidth="10" strokeLinecap="round" fill="none" />
+      </g>
+      {/* Corpo fofo */}
+      <rect x="30" y="34" width="84" height="86" rx="42" fill="#2CB65E" stroke="#1D8A45" strokeWidth="3.5" />
+      <ellipse cx="72" cy="98" rx="25" ry="16" fill="#FFF9F0" />
+      {/* Olhos piscando */}
+      <g className="animate-na-blink">
+        <ellipse cx="56" cy="66" rx="8.5" ry="9.5" fill="#FFFFFF" />
+        <circle cx="58" cy="67" r="4.8" fill="#242126" />
+        <circle cx="59.5" cy="65" r="1.8" fill="#FFFFFF" />
+        <ellipse cx="88" cy="66" rx="8.5" ry="9.5" fill="#FFFFFF" />
+        <circle cx="90" cy="67" r="4.8" fill="#242126" />
+        <circle cx="91.5" cy="65" r="1.8" fill="#FFFFFF" />
+      </g>
+      <ellipse cx="44" cy="77" rx="6" ry="3.5" fill="#FF9EB8" opacity="0.8" />
+      <ellipse cx="100" cy="77" rx="6" ry="3.5" fill="#FF9EB8" opacity="0.8" />
+      <path d="M60 79 Q72 91 84 79 Z" fill="#FFFFFF" stroke="#1D8A45" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
 const CAST_CHEERS: Record<CastId, string[]> = {
   puz: ['Você consegue! 🧩', 'Cada peça conta!', 'Vamos brincar aprendendo!'],
+  dino: ['Roooar! Vamos aprender juntos! 🦕', 'Dinossauros amam idiomas! ⭐', 'Você é incrível! 🦖'],
   leo: ['Bora destravar mais uma! 🎧', 'Mandando super bem!', 'Adoro estudar assim!'],
   bia: ['Uhuul! Continua assim! ⭐', 'Você está brilhando!', 'Mais uma estrelinha!'],
   mochi: ['Miau! Vamos treinar os sons! 🐾', 'Sua memória está afiada!', 'Que legal!'],
@@ -367,6 +420,7 @@ export function InteractiveCast({
         {character === 'puz' && (
           <PuzzleMascot size={size} mood={bouncing ? 'happy' : mood} />
         )}
+        {character === 'dino' && <DinoCharacter size={size} excited={bouncing} />}
         {character === 'leo' && <LeoCharacter size={size} excited={bouncing} />}
         {character === 'bia' && <BiaCharacter size={size} excited={bouncing} />}
         {character === 'mochi' && <MochiCharacter size={size} excited={bouncing} />}

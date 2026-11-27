@@ -4,7 +4,7 @@ import { Heart, Sparkle, X } from '@phosphor-icons/react';
 import { hapticSuccess, hapticTap } from '../lib/native';
 import { playPetHappySound, playTapSound } from '../lib/sound';
 
-export type PetSpecies = 'puzinho' | 'mochi' | 'tico';
+export type PetSpecies = 'puzinho' | 'dino' | 'mochi' | 'tico';
 export type PetMood = 'idle' | 'happy' | 'super_happy' | 'sad' | 'walking' | 'celebrate';
 
 export interface PetProfile {
@@ -36,14 +36,23 @@ export const PET_CATALOG: Record<
     accent: '#F4B400',
     softBg: '#FFE8F0',
   },
-  mochi: {
-    defaultName: 'Mochi',
-    titlePt: 'Gatinho Esmeralda',
-    descPt: 'Tem uma pecinha dourada na testa e ama ler Hangul e idiomas!',
+  dino: {
+    defaultName: 'Dino',
+    titlePt: 'Dinossaurinho Curioso',
+    descPt: 'Roooar! Ama aprender idiomas, dar pulos gigantes e colecionar peças!',
     primary: '#2CB65E',
     dark: '#1D8A45',
     accent: '#F4B400',
     softBg: '#E2F9EB',
+  },
+  mochi: {
+    defaultName: 'Mochi',
+    titlePt: 'Gatinho Esmeralda',
+    descPt: 'Tem uma pecinha dourada na testa e ama ler Hangul e idiomas!',
+    primary: '#1496B0',
+    dark: '#0C6F84',
+    accent: '#F4B400',
+    softBg: '#E2F7FB',
   },
   tico: {
     defaultName: 'Tico',
@@ -244,7 +253,48 @@ export function PetSprite({
             </g>
           )}
 
-          {/* ESPÉCIE 2: MOCHI (Gatinho Esmeralda com Pecinha Dourada!) */}
+          {/* ESPÉCIE 2: DINO (Dinossaurinho Curioso com Crista Dourada & Rabinho!) */}
+          {species === 'dino' && (
+            <g>
+              {/* Rabinho de dinossauro abanando */}
+              <path
+                d="M114 106 C138 112 150 96 146 80 C138 88 128 92 114 92 Z"
+                fill="#2CB65E"
+                stroke="#1D8A45"
+                strokeWidth="3.5"
+                strokeLinejoin="round"
+                className={isHappy || isWalking ? 'animate-na-wave' : ''}
+              />
+              {/* Cristinhas douradas e bordô no topo da cabeça e costas */}
+              <g transform={isSad ? 'translate(0, 4)' : undefined}>
+                <polygon points="56,36 66,18 76,34" fill="#F4B400" stroke="#C98A00" strokeWidth="2.5" strokeLinejoin="round" />
+                <polygon points="74,33 85,15 96,34" fill="#C12B5B" stroke="#7A1436" strokeWidth="2.5" strokeLinejoin="round" />
+                <polygon points="94,38 106,24 112,44" fill="#1496B0" stroke="#0C6F84" strokeWidth="2.5" strokeLinejoin="round" />
+              </g>
+              {/* Bracinhos curtinhos fofos de dino */}
+              <path
+                d={isHappy ? 'M38 92 L22 76' : 'M38 96 L24 98'}
+                stroke="#1D8A45"
+                strokeWidth="10"
+                strokeLinecap="round"
+              />
+              <path
+                d={isHappy ? 'M122 92 L138 76' : 'M122 96 L136 98'}
+                stroke="#1D8A45"
+                strokeWidth="10"
+                strokeLinecap="round"
+              />
+              {/* Corpo fofinho arredondado de dinossauro */}
+              <rect x="34" y="34" width="92" height="96" rx="44" fill="#1D8A45" transform="translate(0, 4)" />
+              <rect x="34" y="34" width="92" height="96" rx="44" fill="#2CB65E" />
+              {/* Barriguinha creme com pintinhas alegres */}
+              <ellipse cx="80" cy="108" rx="28" ry="18" fill="#FFF9F0" />
+              <circle cx="46" cy="56" r="5" fill="#1D8A45" opacity="0.35" />
+              <circle cx="114" cy="60" r="4.5" fill="#1D8A45" opacity="0.35" />
+            </g>
+          )}
+
+          {/* ESPÉCIE 3: MOCHI (Gatinho Esmeralda com Pecinha Dourada!) */}
           {species === 'mochi' && (
             <g>
               {/* Rabinho abanando */}
@@ -464,8 +514,8 @@ export function PetPickerModal({ pet, onSave, onClose }: PetPickerModalProps) {
           <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)]">
             Escolha seu bichinho:
           </div>
-          <div className="grid grid-cols-3 gap-2.5">
-            {(['puzinho', 'mochi', 'tico'] as PetSpecies[]).map((sp) => {
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {(['puzinho', 'dino', 'mochi', 'tico'] as PetSpecies[]).map((sp) => {
               const active = species === sp;
               return (
                 <button
@@ -477,6 +527,7 @@ export function PetPickerModal({ pet, onSave, onClose }: PetPickerModalProps) {
                     setSpecies(sp);
                     if (
                       name === PET_CATALOG.puzinho.defaultName ||
+                      name === PET_CATALOG.dino.defaultName ||
                       name === PET_CATALOG.mochi.defaultName ||
                       name === PET_CATALOG.tico.defaultName
                     ) {
@@ -489,7 +540,7 @@ export function PetPickerModal({ pet, onSave, onClose }: PetPickerModalProps) {
                       : 'bg-white border-[var(--na-border)] text-[var(--na-ink)]'
                   }`}
                 >
-                  <PetSprite species={sp} mood={active ? 'happy' : 'idle'} size={58} />
+                  <PetSprite species={sp} mood={active ? 'happy' : 'idle'} size={56} />
                   <span className="text-xs font-extrabold">{PET_CATALOG[sp].defaultName}</span>
                 </button>
               );

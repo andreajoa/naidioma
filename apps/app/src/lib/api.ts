@@ -517,4 +517,37 @@ export const api = {
       adminKey,
       body: JSON.stringify(payload),
     }),
+
+  getPushStatus: () =>
+    request<{
+      vapidPublicKey: string;
+      enabled: boolean;
+      devicesCount: number;
+      reminderHour: number;
+      petName: string;
+    }>('/api/push/status'),
+
+  subscribePush: (payload: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    reminderHour: number;
+    timezoneOffset: number;
+    petName: string;
+  }) =>
+    request<{ ok: boolean; id: string; reminderHour: number }>('/api/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  unsubscribePush: (endpoint?: string) =>
+    request<{ ok: boolean }>('/api/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify(endpoint ? { endpoint } : {}),
+    }),
+
+  sendTestPush: () =>
+    request<{ ok: boolean; delivered: number }>('/api/push/test', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };

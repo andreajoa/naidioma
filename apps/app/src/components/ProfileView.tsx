@@ -23,9 +23,11 @@ import {
   setSoundEnabled,
 } from '../lib/sound';
 import { LANGUAGE_FLAGS, PuzzleMascot } from './Mascots';
+import { ReminderCard } from './ReminderCard';
 
 interface ProfileViewProps {
   user: UserProfile;
+  petName: string;
   billing: BillingStatusResponse | null;
   onUserUpdated: (user: UserProfile) => void;
   onOpenBilling: () => void;
@@ -35,6 +37,7 @@ interface ProfileViewProps {
 
 export function ProfileView({
   user,
+  petName,
   billing,
   onUserUpdated,
   onOpenBilling,
@@ -120,6 +123,9 @@ export function ProfileView({
           <div className="text-xs font-bold text-[var(--na-muted)]">Peças 🧩</div>
         </div>
       </section>
+
+      {/* Lembretes Diários Motivacionais na Tela do Celular */}
+      <ReminderCard petName={petName} />
 
       {/* Conforto Sensorial (Autismo & TDAH) */}
       <section className="duo-card p-5 space-y-3">

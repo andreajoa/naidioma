@@ -31,6 +31,7 @@ import {
   type CastId,
 } from './Mascots';
 import { PetSprite, type PetProfile } from './PetBuddy';
+import { ReminderCard } from './ReminderCard';
 
 interface LearnViewProps {
   user: UserProfile;
@@ -61,28 +62,28 @@ const UNIT_THEMES: UnitTheme[] = [
     border: '#0C6F84',
     soft: '#E2F7FB',
     text: '#0C6F84',
-    cast: 'puz',
+    cast: 'dino',
   },
   {
     bg: '#C12B5B',
     border: '#7A1436',
     soft: '#FFE8F0',
     text: '#7A1436',
-    cast: 'leo',
+    cast: 'puz',
   },
   {
     bg: '#2CB65E',
     border: '#1D8A45',
     soft: '#E2F9EB',
     text: '#1D8A45',
-    cast: 'bia',
+    cast: 'leo',
   },
   {
     bg: '#E5A300',
     border: '#B37A00',
     soft: '#FFF6D6',
     text: '#7A5200',
-    cast: 'mochi',
+    cast: 'bia',
   },
 ];
 
@@ -280,6 +281,11 @@ export function LearnView({
             </span>
           </button>
         )}
+
+        {/* Aviso Motivacional Diário na Tela (visível também no celular!) */}
+        <div className="lg:hidden">
+          <ReminderCard petName={pet.name} compact />
+        </div>
 
         {/* UNIDADES + CAMINHO SINUOSO EM S */}
         {course.units.map((unit, unitIndex) => {
@@ -657,6 +663,9 @@ export function LearnView({
             FAZER CARINHO / TROCAR BICHINHO
           </button>
         </div>
+
+        {/* Card Lembretes Diários Motivacionais com o Dino */}
+        <ReminderCard petName={pet.name} compact />
 
         {/* Card Foco Diário */}
         <div className="duo-card p-5 space-y-3">

@@ -257,31 +257,54 @@ export function HeroAutismScene() {
         </svg>
       </motion.div>
 
-      {/* 5. GATINHO MOCHI ESMERALDA + FAÍSCA DE HIPERFOCO TDAH (Topo-direita) */}
+      {/* 5. DINOSSAURO FOFO COM CRISTA DOURADA + FAÍSCA DE HIPERFOCO TDAH (Topo-direita — Autistas amam dinossauros!) */}
       <motion.div
-        animate={{ y: [0, -8, 0], rotate: [10, 18, 10] }}
-        transition={{ duration: 3.3, delay: 0.7, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute right-[14%] top-[4%] w-[24%] z-20"
+        animate={{ y: [0, -10, 0], rotate: [6, 15, 6] }}
+        transition={{ duration: 3.2, delay: 0.6, repeat: Infinity, ease: 'easeInOut' }}
+        whileHover={{ scale: 1.14 }}
+        className="absolute right-[10%] top-[2%] w-[28%] z-20"
       >
-        <svg viewBox="0 0 120 110" className="w-full h-auto overflow-visible">
-          {/* Orelhinhas */}
-          <path d="M34 40 L30 16 L54 30 Z" fill="#2CB65E" stroke="#1D8A45" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M84 40 L88 16 L64 30 Z" fill="#2CB65E" stroke="#1D8A45" strokeWidth="3" strokeLinejoin="round" />
-          <rect x="28" y="30" width="62" height="62" rx="30" fill="#2CB65E" stroke="#1D8A45" strokeWidth="3" />
+        <svg viewBox="0 0 136 126" className="w-full h-auto overflow-visible">
+          {/* Rabinho fofo */}
+          <path
+            d="M94 84 C116 90 128 76 124 62 C116 69 106 72 96 72 Z"
+            fill="#2CB65E"
+            stroke="#1D8A45"
+            strokeWidth="3"
+            strokeLinejoin="round"
+          />
+          {/* Cristas coloridas (ouro, bordô, azul-petróleo) */}
+          <polygon points="44,30 52,14 62,28" fill="#F4B400" stroke="#C98A00" strokeWidth="2.4" strokeLinejoin="round" />
+          <polygon points="60,26 70,10 80,27" fill="#C12B5B" stroke="#7A1436" strokeWidth="2.4" strokeLinejoin="round" />
+          <polygon points="78,31 89,18 95,36" fill="#1496B0" stroke="#0C6F84" strokeWidth="2.4" strokeLinejoin="round" />
+          {/* Bracinhos felizes */}
+          <path d="M30 72 L16 58" stroke="#1D8A45" strokeWidth="9" strokeLinecap="round" />
+          <path d="M96 72 L110 58" stroke="#1D8A45" strokeWidth="9" strokeLinecap="round" />
+          {/* Corpinho verde vivo */}
+          <rect x="26" y="26" width="76" height="78" rx="38" fill="#2CB65E" stroke="#1D8A45" strokeWidth="3.5" />
+          <ellipse cx="64" cy="86" rx="22" ry="14" fill="#FFF9F0" />
+          {/* Pezinhos */}
+          <ellipse cx="46" cy="105" rx="10" ry="6" fill="#1D8A45" />
+          <ellipse cx="82" cy="105" rx="10" ry="6" fill="#1D8A45" />
           {/* Faísca dourada TDAH super-foco */}
           <polygon
-            points="100,12 90,30 98,30 92,46 110,25 101,25"
+            points="118,12 108,29 116,29 110,45 128,24 119,24"
             fill="#F4B400"
             stroke="#C98A00"
             strokeWidth="2"
             strokeLinejoin="round"
             className="animate-na-sparkle"
           />
-          <circle cx="48" cy="54" r="4.5" fill="#242126" />
-          <circle cx="70" cy="54" r="4.5" fill="#242126" />
-          <circle cx="50" cy="52" r="1.6" fill="#FFFFFF" />
-          <circle cx="72" cy="52" r="1.6" fill="#FFFFFF" />
-          <path d="M53 64 Q59 70 65 64" stroke="#FFF9F0" strokeWidth="3" strokeLinecap="round" fill="none" />
+          {/* Olhos e sorrisão */}
+          <g className="animate-na-blink">
+            <circle cx="50" cy="54" r="5" fill="#242126" />
+            <circle cx="76" cy="54" r="5" fill="#242126" />
+            <circle cx="52" cy="52" r="1.8" fill="#FFFFFF" />
+            <circle cx="78" cy="52" r="1.8" fill="#FFFFFF" />
+          </g>
+          <ellipse cx="39" cy="63" rx="5" ry="3" fill="#FF9EB8" opacity="0.75" />
+          <ellipse cx="87" cy="63" rx="5" ry="3" fill="#FF9EB8" opacity="0.75" />
+          <path d="M54 65 Q63 75 72 65 Z" fill="#FFFFFF" stroke="#1D8A45" strokeWidth="2.2" />
         </svg>
       </motion.div>
 
