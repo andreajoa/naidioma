@@ -1,0 +1,9 @@
+{
+  "name": "naidioma",
+  "crons": [
+    {
+      "path": "/api/cron/health-ping",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

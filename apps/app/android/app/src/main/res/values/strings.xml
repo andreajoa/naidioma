@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NAidioma</string>
+    <string name="title_activity_main">NAidioma</string>
+    <string name="package_name">com.naidioma.app</string>
+    <string name="custom_url_scheme">com.naidioma.app</string>
+</resources>

@@ -1,0 +1,99 @@
+name: NAidioma — Build Web, Android & Apple iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: 'URL online do NAidioma no NexaCloud para empacotar nos apps Android/iOS'
+        required: false
+        default: 'https://naidioma.com.br'
+
+jobs:
+  web-and-api:
+    name: Build & Test Web + API (Cloud PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: naidioma
+          POSTGRES_PASSWORD: naidioma_ci_password
+          POSTGRES_DB: naidioma_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm typecheck
+      - run: pnpm build
+      - env:
+          DATABASE_URL: postgresql://naidioma:naidioma_ci_password@127.0.0.1:5432/naidioma_test
+          JWT_SECRET: ci-test-jwt-secret-key-for-github-actions
+          ADMIN_API_KEY: ci-test-admin-key-for-github-actions
+        run: pnpm db:push && pnpm test
+
+  android-apk:
+    name: Build Android App (Capacitor Gradle)
+    needs: web-and-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: pnpm install --no-frozen-lockfile
+      - env:
+          VITE_API_BASE_URL: ${{ inputs.api_base_url || vars.VITE_API_BASE_URL || 'https://naidioma.com.br' }}
+        run: pnpm --filter @naidioma/shared build && pnpm --filter @naidioma/app build && pnpm --filter @naidioma/app cap:sync
+      - name: Compile Android Debug APK
+        working-directory: apps/app/android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: naidioma-android-apk
+          path: apps/app/android/app/build/outputs/apk/debug/*.apk
+
+  ios-xcode:
+    name: Verify Apple iOS Build (Xcode SPM)
+    needs: web-and-api
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - env:
+          VITE_API_BASE_URL: ${{ inputs.api_base_url || vars.VITE_API_BASE_URL || 'https://naidioma.com.br' }}
+        run: pnpm --filter @naidioma/shared build && pnpm --filter @naidioma/app build && pnpm --filter @naidioma/app cap:sync
+      - name: Build Apple iOS Simulator Binary (Swift Package Manager)
+        working-directory: apps/app/ios/App
+        run: xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build

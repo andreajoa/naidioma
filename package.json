@@ -1,0 +1,23 @@
+{
+  "name": "naidioma-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @naidioma/api --filter @naidioma/app dev",
+    "dev:api": "pnpm --filter @naidioma/api dev",
+    "dev:app": "pnpm --filter @naidioma/app dev",
+    "build": "pnpm --filter @naidioma/shared build && pnpm --filter @naidioma/app build && pnpm --filter @naidioma/api build",
+    "start": "pnpm --filter @naidioma/api start",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @naidioma/shared test && pnpm --filter @naidioma/api test",
+    "db:push": "pnpm --filter @naidioma/api db:push",
+    "db:generate": "pnpm --filter @naidioma/api db:generate",
+    "mobile:sync": "pnpm --filter @naidioma/app build && pnpm --filter @naidioma/app cap:sync",
+    "mobile:android": "pnpm --filter @naidioma/app cap:open:android",
+    "mobile:ios": "pnpm --filter @naidioma/app cap:open:ios"
+  }
+}

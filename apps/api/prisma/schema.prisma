@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 100% Cloud PostgreSQL (NexaCloud / Neon / Supabase)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  passwordHash          String
+  displayName           String
+  whatsapp              String?
+  role                  String    @default("user") // user | admin
+  activeLanguage        String    @default("en")
+  dailyGoalMinutes      Int       @default(10)
+  xpTotal               Int       @default(0)
+  streakDays            Int       @default(0)
+  longestStreak         Int       @default(0)
+  lastStudyDate         String?   // YYYY-MM-DD
+
+  // Mailing & Email Marketing (LGPD compliant)
+  marketingOptIn        Boolean   @default(true)
+  marketingOptInAt      DateTime?
+  leadSource            String    @default("nucleoafetar")
+  utmCampaign           String?
+  welcomeEmailSent      Boolean   @default(false)
+
+  // Monetization & Stripe (Hidden in UI until BILLING_UI_ENABLED=true)
+  subscriptionTier      String    @default("free") // free | plus | pro
+  subscriptionPlanKey   String?
+  subscriptionProvider  String?   // stripe | apple_iap | google_play
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  subscriptionExpiresAt DateTime?
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  lessonProgress        LessonProgress[]
+  skillScores           SkillScore[]
+  fsrsCards             FsrsCard[]
+  conversations         ConversationSession[]
+  feedbacks             BetaFeedback[]
+  aiUsage               AiUsageDaily[]
+
+  @@index([marketingOptIn, activeLanguage])
+  @@index([leadSource, createdAt])
+}
+
+model LessonProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  language       String
+  lessonId       String
+  bestAccuracy   Int      @default(0)
+  xpEarned       Int      @default(0)
+  completedCount Int      @default(1)
+  completedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId, language])
+}
+
+model SkillScore {
+  id         String   @id @default(cuid())
+  userId     String
+  language   String
+  speaking   Int      @default(10)
+  listening  Int      @default(10)
+  reading    Int      @default(10)
+  writing    Int      @default(10)
+  vocabulary Int      @default(10)
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, language])
+}
+
+model FsrsCard {
+  id            String    @id @default(cuid())
+  userId        String
+  language      String
+  cardId        String
+  stability     Float     @default(0)
+  difficulty    Float     @default(0)
+  elapsedDays   Float     @default(0)
+  scheduledDays Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         String    @default("new") // new | learning | review | relearning
+  dueAt         DateTime  @default(now())
+  lastReviewAt  DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId, language, dueAt])
+}
+
+model ConversationSession {
+  id             String   @id @default(cuid())
+  userId         String
+  language       String
+  scenarioId     String
+  messagesJson   String   @default("[]")
+  turnsCount     Int      @default(0)
+  avgNaturalness Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, language])
+}
+
+model BetaFeedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  platform  String   @default("web") // web | android | ios
+  category  String   @default("ux") // bug | translation | audio | ux | idea
+  language  String?
+  route     String?
+  lessonId  String?
+  message   String
+  userAgent String?
+  status    String   @default("new") // new | in_progress | resolved
+  adminNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+}
+
+model AiUsageDaily {
+  id        String   @id @default(cuid())
+  userId    String
+  dateKey   String   // YYYY-MM-DD
+  turnsUsed Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+}
+
+model RuntimeConfig {
+  key       String   @id
+  valueJson String
+  updatedAt DateTime @updatedAt
+}

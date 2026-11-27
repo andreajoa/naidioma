@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+:root {
+  /* Paleta Oficial Núcleo Afetar (nucleoafetar.com.br) */
+  --na-cream: #f8f4ed;
+  --na-ivory: #fffcf7;
+  --na-sand: #eee5d9;
+  --na-sand-dark: #e4d9c8;
+  --na-burgundy: #783247;
+  --na-wine: #682b3c;
+  --na-wine-deep: #452733;
+  --na-teal: #38697b;
+  --na-gold: #b99a6e;
+  --na-ink: #292b29;
+  --na-muted: #696a65;
+  --na-border: #dfd9cf;
+  --na-success: #285c3b;
+  --na-success-soft: #e6f0e9;
+  --na-error: #9a2c20;
+  --na-error-soft: #faeae8;
+}
+
+@layer base {
+  html {
+    background-color: var(--na-cream);
+    color: var(--na-ink);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', 'PingFang SC', 'Apple SD Gothic Neo', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--na-cream);
+    color: var(--na-ink);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: #d4bcb1;
+    color: #32252a;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    outline-offset: 3px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--na-teal);
+  }
+}
+
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Tactile button feel for mobile thumbs & desktop */
+.btn-tactile-primary {
+  background-color: var(--na-burgundy);
+  color: var(--na-ivory);
+  border: 1.5px solid var(--na-wine-deep);
+  border-bottom-width: 4px;
+  border-radius: 14px;
+  min-height: 48px;
+  font-weight: 700;
+  transition: transform 120ms ease, background-color 160ms ease, border-bottom-width 120ms ease;
+}
+.btn-tactile-primary:hover:not(:disabled) {
+  background-color: var(--na-wine);
+}
+.btn-tactile-primary:active:not(:disabled) {
+  transform: translateY(2px);
+  border-bottom-width: 2px;
+}
+.btn-tactile-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-tactile-secondary {
+  background-color: var(--na-ivory);
+  color: var(--na-ink);
+  border: 1.5px solid var(--na-border);
+  border-bottom-width: 3px;
+  border-radius: 14px;
+  min-height: 48px;
+  font-weight: 600;
+  transition: transform 120ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+.btn-tactile-secondary:hover:not(:disabled) {
+  background-color: var(--na-sand);
+  border-color: var(--na-gold);
+}
+.btn-tactile-secondary:active:not(:disabled) {
+  transform: translateY(1.5px);
+}
+
+.surface-card {
+  background-color: var(--na-ivory);
+  border: 1.5px solid var(--na-border);
+  border-radius: 16px;
+}
+
+.surface-sand {
+  background-color: var(--na-sand);
+  border: 1px solid var(--na-sand-dark);
+  border-radius: 16px;
+}
+
+/* Safe area helpers for iOS notch / Android gesture bar */
+.safe-bottom {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.safe-top {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
