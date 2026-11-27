@@ -1,8 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { motion } from 'motion/react';
 import {
   ArrowLeft,
   ArrowRight,
+  CaretDown,
+  CaretLeft,
+  CaretRight,
   EnvelopeSimple,
   LockSimple,
   User,
@@ -13,6 +16,7 @@ import { api, type UserProfile } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
 import { playCorrectSound, playGentleRetrySound, playTapSound } from '../lib/sound';
 import { speakText } from '../lib/speech';
+import { FlagSvg, HeroAutismScene } from './HeroAutismScene';
 import { LANGUAGE_FLAGS, PuzzleMascot } from './Mascots';
 
 interface AuthScreenProps {
@@ -21,7 +25,7 @@ interface AuthScreenProps {
 
 type AuthStep = 'welcome' | 'language' | 'register' | 'login';
 
-const ORDERED_LANGUAGES: LanguageCode[] = ['ko', 'en', 'ja', 'es', 'fr', 'de', 'it', 'zh'];
+const ORDERED_LANGUAGES: LanguageCode[] = ['en', 'ko', 'es', 'fr', 'de', 'it', 'ja', 'zh'];
 
 const GREETING_BY_LANG: Record<LanguageCode, string> = {
   ko: '안녕하세요!',
@@ -53,6 +57,21 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ribbonRef = useRef<HTMLDivElement>(null);
+
+  function scrollRibbon(dir: -1 | 1) {
+    playTapSound();
+    ribbonRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  }
+
+  function handleQuickPickFromRibbon(code: LanguageCode) {
+    void hapticTap();
+    playCorrectSound(1);
+    setSelectedLang(code);
+    speakText(GREETING_BY_LANG[code], code, 0.95);
+    setError(null);
+    setStep('register');
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -93,104 +112,128 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }
 
-  // PASSO 1: Abertura estilo Duolingo com o mascote Quebra-Cabeça (Puz)
+  // =========================================================================
+  // PASSO 1: PRIMEIRA TELA LIMPA ESTILO DUOLINGO (Paleta NAidioma + Autismo/TDAH)
+  // =========================================================================
   if (step === 'welcome') {
     return (
-      <div className="min-h-[100dvh] bg-[var(--na-cream)] flex flex-col justify-between px-5 py-8 safe-top safe-bottom">
-        <div className="max-w-lg w-full mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-[var(--na-burgundy)] text-white font-display text-lg border-b-4 border-[var(--na-wine-deep)]">
-              🧩
+      <div className="min-h-[100dvh] bg-[#FFFDF9] text-[var(--na-ink)] flex flex-col justify-between">
+        {/* Topo super limpo igual ao Duolingo */}
+        <header className="w-full max-w-5xl mx-auto px-5 sm:px-8 h-18 flex items-center justify-between safe-top">
+          <div className="flex items-center gap-2">
+            <PuzzleMascot mood="idle" size={44} />
+            <span className="font-display text-2xl sm:text-[28px] tracking-tight text-[var(--na-burgundy)]">
+              NAidioma
             </span>
-            <div>
-              <div className="font-display text-2xl text-[var(--na-burgundy)] leading-none">
-                NAidioma
-              </div>
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--na-teal)] mt-0.5">
-                Núcleo Afetar
-              </div>
-            </div>
           </div>
 
-          <span className="px-3 py-1 rounded-full bg-[var(--na-gold-soft)] border-2 border-[var(--na-gold)] text-[11px] font-extrabold text-[#7a5200]">
-            100% GRÁTIS
-          </span>
-        </div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.08em] text-[#9A8E83] select-none">
+            <span>IDIOMA DO SITE: PORTUGUÊS</span>
+            <CaretDown size={13} weight="bold" />
+          </div>
+        </header>
 
-        <motion.main
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-          className="max-w-md w-full mx-auto flex flex-col items-center text-center my-auto py-8"
-        >
-          {/* Balão animado do Puz */}
+        {/* Centro respirável: Cena animada à esquerda + Título e 2 botões 3D à direita */}
+        <main className="flex-1 w-full max-w-5xl mx-auto px-5 sm:px-8 py-6 sm:py-8 flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-14">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.94 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="relative mb-3 px-5 py-2.5 rounded-2xl bg-white border-2 border-[var(--na-border)] shadow-xs text-sm font-extrabold text-[var(--na-ink)]"
+            transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+            className="w-full lg:w-1/2 flex items-center justify-center"
           >
-            Oi! Eu sou o Puz! Vamos aprender brincando? 🧩
-            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white border-r-2 border-b-2 border-[var(--na-border)] rotate-45" />
+            <HeroAutismScene />
           </motion.div>
 
-          <PuzzleMascot mood="wave" size={184} />
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 240, damping: 24, delay: 0.06 }}
+            className="w-full max-w-[440px] lg:w-1/2 flex flex-col items-center text-center space-y-7"
+          >
+            <h1 className="font-display text-[28px] sm:text-[34px] leading-[1.2] text-[#453D42]">
+              O jeito mais divertido de aprender idiomas, letras e muito mais!
+            </h1>
 
-          <h1 className="font-display text-3xl sm:text-4xl text-[var(--na-ink)] leading-tight mt-2">
-            O jeito divertido de aprender idiomas!
-          </h1>
-          <p className="text-sm sm:text-base font-medium text-[var(--na-muted)] mt-2.5 max-w-sm leading-relaxed">
-            Feito para crianças e adultos: trilha com desafios rápidos, letras que falam,
-            personagens animados e modo offline.
-          </p>
-
-          {/* Mini fila de bandeiras */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-            {ORDERED_LANGUAGES.map((code) => (
-              <span
-                key={code}
-                className="px-2.5 py-1 rounded-full bg-white border-2 border-[var(--na-border)] text-xs font-extrabold text-[var(--na-ink)] inline-flex items-center gap-1"
+            <div className="w-full max-w-[330px] space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void hapticTap();
+                  playCorrectSound(1);
+                  setStep('language');
+                }}
+                className="duo-btn-wine w-full text-[15px] uppercase tracking-wider"
               >
-                <span>{LANGUAGE_FLAGS[code].emoji}</span>
-                <span>{LANGUAGE_FLAGS[code].shortName}</span>
-              </span>
-            ))}
+                COMECE AGORA
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void hapticTap();
+                  playTapSound();
+                  setError(null);
+                  setStep('login');
+                }}
+                className="duo-btn-white w-full text-[15px] uppercase tracking-wider text-[var(--na-teal)]"
+              >
+                JÁ TENHO UMA CONTA
+              </button>
+            </div>
+          </motion.div>
+        </main>
+
+        {/* Barra inferior de bandeiras igual ao Duolingo (com setas < > e clique direto!) */}
+        <footer className="w-full border-t-2 border-[#EFE6DA] bg-white/90 safe-bottom">
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 h-[74px] flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => scrollRibbon(-1)}
+              aria-label="Idiomas anteriores"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[#9A8E83] hover:text-[var(--na-burgundy)] hover:bg-[var(--na-cream)] shrink-0"
+            >
+              <CaretLeft size={18} weight="bold" />
+            </button>
+
+            <div
+              ref={ribbonRef}
+              className="flex-1 flex items-center gap-5 sm:gap-7 overflow-x-auto no-scrollbar py-2 scroll-smooth"
+            >
+              {ORDERED_LANGUAGES.map((code) => {
+                const flag = LANGUAGE_FLAGS[code];
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => handleQuickPickFromRibbon(code)}
+                    className="shrink-0 inline-flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-[var(--na-cream)] transition-colors group"
+                  >
+                    <FlagSvg code={code} className="w-9 h-6 shadow-2xs group-hover:scale-105 transition-transform" />
+                    <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#6C646B] group-hover:text-[var(--na-burgundy)]">
+                      {flag.shortName}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollRibbon(1)}
+              aria-label="Próximos idiomas"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-[#9A8E83] hover:text-[var(--na-burgundy)] hover:bg-[var(--na-cream)] shrink-0"
+            >
+              <CaretRight size={18} weight="bold" />
+            </button>
           </div>
-        </motion.main>
-
-        {/* Botões gigantes 3D estilo Duolingo */}
-        <div className="max-w-md w-full mx-auto space-y-3">
-          <button
-            type="button"
-            onClick={() => {
-              void hapticTap();
-              playCorrectSound(1);
-              setStep('language');
-            }}
-            className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
-          >
-            COMEÇAR AGORA
-            <ArrowRight size={20} weight="bold" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              void hapticTap();
-              playTapSound();
-              setError(null);
-              setStep('login');
-            }}
-            className="duo-btn-white w-full text-base uppercase tracking-wide text-[var(--na-teal)]"
-          >
-            JÁ TENHO CONTA
-          </button>
-        </div>
+        </footer>
       </div>
     );
   }
 
-  // PASSO 2: Escolha do idioma com bandeiras grandes e áudio instantâneo
+  // =========================================================================
+  // PASSO 2: Escolha do idioma com bandeiras nítidas e áudio instantâneo
+  // =========================================================================
   if (step === 'language') {
     return (
       <div className="min-h-[100dvh] bg-[var(--na-cream)] flex flex-col justify-between px-5 py-6 safe-top safe-bottom">
@@ -208,7 +251,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <ArrowLeft size={20} weight="bold" />
             </button>
             <div className="flex-1 h-4 rounded-full bg-[var(--na-sand-dark)] overflow-hidden p-0.5">
-              <div className="h-full w-1/2 rounded-full bg-[var(--na-success)] transition-all duration-300" />
+              <div className="h-full w-1/2 rounded-full bg-[var(--na-burgundy)] transition-all duration-300" />
             </div>
           </div>
 
@@ -239,13 +282,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   }}
                   className={`p-4 rounded-2xl border-2 border-b-[5px] text-left transition-all flex items-center gap-3 active:translate-y-[2px] ${
                     active
-                      ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                      ? 'bg-[var(--na-rose-soft)] border-[var(--na-burgundy)] text-[var(--na-wine-deep)]'
                       : 'bg-white border-[var(--na-border)] text-[var(--na-ink)] hover:border-[var(--na-gold)]'
                   }`}
                 >
-                  <span className="text-3xl leading-none shrink-0" role="img" aria-label={flag.shortName}>
-                    {flag.emoji}
-                  </span>
+                  <FlagSvg code={code} className="w-10 h-7" />
                   <div className="min-w-0">
                     <div className="font-extrabold text-base leading-tight truncate">
                       {flag.shortName}
@@ -268,10 +309,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               playCorrectSound(1);
               setStep('register');
             }}
-            className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
+            className="duo-btn-wine w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
           >
-            CONTINUAR COM {LANGUAGE_FLAGS[selectedLang].shortName.toUpperCase()}{' '}
-            {LANGUAGE_FLAGS[selectedLang].emoji}
+            CONTINUAR COM {LANGUAGE_FLAGS[selectedLang].shortName.toUpperCase()}
             <ArrowRight size={20} weight="bold" />
           </button>
         </div>
@@ -279,7 +319,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     );
   }
 
-  // PASSO 3: Criar perfil rápido ou Entrar (com cadastro obrigatório para salvar progresso + LGPD)
+  // =========================================================================
+  // PASSO 3: Criar perfil rápido ou Entrar (com cadastro obrigatório + LGPD)
+  // =========================================================================
   const isRegister = step === 'register';
 
   return (
@@ -300,17 +342,25 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               <ArrowLeft size={20} weight="bold" />
             </button>
             <div className="flex-1 h-4 rounded-full bg-[var(--na-sand-dark)] overflow-hidden p-0.5">
-              <div className="h-full w-full rounded-full bg-[var(--na-success)] transition-all duration-300" />
+              <div className="h-full w-full rounded-full bg-[var(--na-burgundy)] transition-all duration-300" />
             </div>
           </div>
 
           <div className="flex items-center gap-3 mb-5">
             <PuzzleMascot mood={isRegister ? 'celebrate' : 'wave'} size={78} className="shrink-0" />
             <div className="flex-1 p-3.5 rounded-2xl bg-white border-2 border-[var(--na-border)]">
-              <div className="font-extrabold text-sm text-[var(--na-ink)] leading-snug">
-                {isRegister
-                  ? `Crie seu perfil grátis para começar ${LANGUAGE_FLAGS[selectedLang].shortName} ${LANGUAGE_FLAGS[selectedLang].emoji}`
-                  : 'Que bom te ver de volta! Vamos continuar a trilha?'}
+              <div className="font-extrabold text-sm text-[var(--na-ink)] leading-snug flex items-center gap-2 flex-wrap">
+                {isRegister ? (
+                  <>
+                    <span>Crie seu perfil grátis para</span>
+                    <span className="inline-flex items-center gap-1.5 text-[var(--na-burgundy)]">
+                      <FlagSvg code={selectedLang} className="w-6 h-4" />
+                      {LANGUAGE_FLAGS[selectedLang].shortName}
+                    </span>
+                  </>
+                ) : (
+                  'Que bom te ver de volta! Vamos continuar a trilha?'
+                )}
               </div>
               {isRegister && (
                 <div className="text-[11px] font-semibold text-[var(--na-muted)] mt-0.5">
@@ -485,7 +535,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             <button
               type="submit"
               disabled={loading}
-              className="duo-btn-emerald w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
+              className="duo-btn-wine w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
             >
               {loading
                 ? 'Preparando sua trilha...'

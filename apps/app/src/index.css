@@ -269,6 +269,14 @@
   padding-top: max(10px, env(safe-area-inset-top));
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ============================================================================
    ANIMAÇÕES DOS PERSONAGENS & TRILHA (GPU-accelerated: transform / opacity)
    ============================================================================ */
