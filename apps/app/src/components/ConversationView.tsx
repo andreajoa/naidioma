@@ -9,6 +9,7 @@ import {
   SpeakerHigh,
   Sparkle,
   StopCircle,
+  VideoCamera,
 } from '@phosphor-icons/react';
 import {
   LANGUAGES,
@@ -18,6 +19,7 @@ import {
 } from '@naidioma/shared';
 import { api } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
+import { playTapSound } from '../lib/sound';
 import {
   createAudioRecorder,
   createSpeechRecognizer,
@@ -27,11 +29,16 @@ import {
   type AudioRecorderHandle,
   type SpeechRecognizerHandle,
 } from '../lib/speech';
+import { LiveCallView } from './LiveCallView';
 import { InteractiveCast } from './Mascots';
+import type { PetProfile } from './PetBuddy';
+import { TUTOR_PROFILES, TutorAvatar, type TutorId } from './TutorAvatar';
 
 interface ConversationViewProps {
   language: LanguageCode;
   scenarios: ConversationScenario[];
+  pet: PetProfile;
+  onPetHappinessChange?: (delta: number) => void;
 }
 
 interface ChatTurn {
@@ -44,9 +51,17 @@ interface ChatTurn {
   providerUsed?: string;
 }
 
-export function ConversationView({ language, scenarios }: ConversationViewProps) {
+export function ConversationView({
+  language,
+  scenarios,
+  pet,
+  onPetHappinessChange,
+}: ConversationViewProps) {
   const langMeta = LANGUAGES[language];
+  const [practiceMode, setPracticeMode] = useState<'call' | 'chat'>('call');
+  const [selectedTutor, setSelectedTutor] = useState<TutorId>('maya');
   const [activeScenario, setActiveScenario] = useState<ConversationScenario | null>(null);
+  const [activeMode, setActiveMode] = useState<'call' | 'chat'>('call');
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -67,20 +82,24 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
-  function startScenario(scenario: ConversationScenario) {
+  function startScenario(scenario: ConversationScenario, mode: 'call' | 'chat' = practiceMode) {
     void hapticTap();
+    playTapSound();
+    setActiveMode(mode);
     setActiveScenario(scenario);
     setError(null);
-    setMessages([
-      {
-        id: 'opening',
-        role: 'assistant',
-        text: scenario.openingLine,
-        reading: scenario.openingReading,
-        translationPt: scenario.openingTranslationPt,
-      },
-    ]);
-    speakText(scenario.openingLine, language, 0.95);
+    if (mode === 'chat') {
+      setMessages([
+        {
+          id: 'opening',
+          role: 'assistant',
+          text: scenario.openingLine,
+          reading: scenario.openingReading,
+          translationPt: scenario.openingTranslationPt,
+        },
+      ]);
+      speakText(scenario.openingLine, language, 0.95);
+    }
   }
 
   async function sendTurn(textToSend?: string) {
@@ -188,23 +207,120 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
     setRecording(true);
   }
 
+  if (activeScenario && activeMode === 'call') {
+    return (
+      <LiveCallView
+        language={language}
+        scenario={activeScenario}
+        tutorId={selectedTutor}
+        pet={pet}
+        onExit={() => setActiveScenario(null)}
+        onPetHappinessChange={onPetHappinessChange}
+      />
+    );
+  }
+
   if (!activeScenario) {
+    const tutorChoices: Array<{ id: TutorId; name: string; sub: string }> = [
+      { id: 'maya', name: TUTOR_PROFILES.maya.name, sub: TUTOR_PROFILES.maya.accentPt },
+      { id: 'oliver', name: TUTOR_PROFILES.oliver.name, sub: TUTOR_PROFILES.oliver.accentPt },
+      { id: 'pet', name: pet.name, sub: 'Seu bichinho' },
+    ];
+
     return (
       <div className="max-w-3xl mx-auto space-y-5 pb-8">
         <div className="rounded-[24px] bg-[var(--na-burgundy)] text-white p-5 border-2 border-[var(--na-wine-deep)] border-b-[6px] flex items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="text-xs font-extrabold uppercase tracking-[0.15em] text-[#ffd7e5]">
-              Bate-Papo por Voz IA · {langMeta.namePt}
+              Prática Real por Voz · Llama 3.3 + Whisper 24/7 · {langMeta.namePt}
             </div>
             <h1 className="font-display text-2xl sm:text-3xl leading-tight">
-              Converse sem vergonha com nossos personagens!
+              Converse cara a cara com seu Tutor IA!
             </h1>
             <p className="text-xs sm:text-sm text-white/90 font-semibold max-w-xl">
-              Toque em uma história, fale no microfone (ou toque nas sugestões prontas) e ouça a resposta!
+              Escolha entre <strong>Chamada ao Vivo com Avatar</strong> (estilo ligação com boca sincronizada e boletim de erros) ou <strong>Chat Guiado</strong>!
             </p>
           </div>
           <InteractiveCast character="leo" size={86} customPhrase="Vamos conversar juntos! 🎙️" />
         </div>
+
+        {/* SELETOR DOS DOIS MODOS (CHAMADA AO VIVO vs CHAT GUIADO) */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              setPracticeMode('call');
+            }}
+            className={`min-h-[56px] px-4 py-3 rounded-2xl border-2 border-b-[5px] text-left flex items-center gap-3 transition-all ${
+              practiceMode === 'call'
+                ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                : 'bg-white border-[var(--na-border)] text-[var(--na-ink)]'
+            }`}
+          >
+            <span className="w-10 h-10 rounded-xl bg-[var(--na-teal)] text-white flex items-center justify-center shrink-0">
+              <VideoCamera size={22} weight="fill" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-extrabold leading-tight">Chamada ao Vivo</div>
+              <div className="text-[11px] font-semibold opacity-80 truncate">Avatar + Lip-Sync + Boletim</div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playTapSound();
+              setPracticeMode('chat');
+            }}
+            className={`min-h-[56px] px-4 py-3 rounded-2xl border-2 border-b-[5px] text-left flex items-center gap-3 transition-all ${
+              practiceMode === 'chat'
+                ? 'bg-[var(--na-rose-soft)] border-[var(--na-burgundy)] text-[var(--na-burgundy)]'
+                : 'bg-white border-[var(--na-border)] text-[var(--na-ink)]'
+            }`}
+          >
+            <span className="w-10 h-10 rounded-xl bg-[var(--na-burgundy)] text-white flex items-center justify-center shrink-0">
+              <ChatCircleDots size={22} weight="fill" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs sm:text-sm font-extrabold leading-tight">Chat Guiado</div>
+              <div className="text-[11px] font-semibold opacity-80 truncate">Mensagens + Dicas ao vivo</div>
+            </div>
+          </button>
+        </div>
+
+        {/* ESCOLHA DO TUTOR AVATAR (QUANDO NO MODO CHAMADA AO VIVO) */}
+        {practiceMode === 'call' && (
+          <div className="duo-card p-4 space-y-3">
+            <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)]">
+              Escolha quem vai conversar com você na ligação:
+            </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              {tutorChoices.map((t) => {
+                const selected = selectedTutor === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => {
+                      playTapSound();
+                      setSelectedTutor(t.id);
+                    }}
+                    className={`p-3 rounded-2xl border-2 border-b-4 flex flex-col items-center gap-1.5 text-center transition-all ${
+                      selected
+                        ? 'bg-[var(--na-teal-soft)] border-[var(--na-teal)] text-[var(--na-teal-dark)]'
+                        : 'bg-[var(--na-cream)] border-[var(--na-border)] text-[var(--na-ink)]'
+                    }`}
+                  >
+                    <TutorAvatar tutorId={t.id} pet={pet} state="idle" mouthLevel={0} size={62} />
+                    <div className="text-xs font-extrabold leading-tight">{t.name}</div>
+                    <div className="text-[10px] font-semibold opacity-80 leading-tight">{t.sub}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {scenarios.map((sc) => (
@@ -234,14 +350,37 @@ export function ConversationView({ language, scenarios }: ConversationViewProps)
                 </ul>
               </div>
 
-              <button
-                type="button"
-                onClick={() => startScenario(sc)}
-                className="btn-tactile-primary w-full text-sm flex items-center justify-center gap-2"
-              >
-                <ChatCircleDots size={18} weight="fill" />
-                Iniciar simulação agora
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startScenario(sc, practiceMode)}
+                  className="btn-tactile-primary flex-1 text-sm flex items-center justify-center gap-2"
+                >
+                  {practiceMode === 'call' ? (
+                    <>
+                      <VideoCamera size={18} weight="fill" />
+                      Ligar ao vivo agora
+                    </>
+                  ) : (
+                    <>
+                      <ChatCircleDots size={18} weight="fill" />
+                      Abrir chat agora
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startScenario(sc, practiceMode === 'call' ? 'chat' : 'call')}
+                  title={practiceMode === 'call' ? 'Abrir como Chat' : 'Abrir como Chamada ao Vivo'}
+                  className="min-h-[48px] px-3 rounded-[14px] bg-[var(--na-cream)] border-2 border-[var(--na-border)] text-[var(--na-ink)] flex items-center justify-center shrink-0"
+                >
+                  {practiceMode === 'call' ? (
+                    <ChatCircleDots size={19} weight="bold" />
+                  ) : (
+                    <VideoCamera size={19} weight="bold" />
+                  )}
+                </button>
+              </div>
             </motion.div>
           ))}
         </div>

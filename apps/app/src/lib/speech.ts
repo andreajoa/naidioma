@@ -84,6 +84,186 @@ function pickBestVoice(
   return [...langMatches].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
 }
 
+export function stopSpeaking(): void {
+  if (speakTimer) {
+    clearTimeout(speakTimer);
+    speakTimer = null;
+  }
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+  } catch {
+    // ignore
+  }
+}
+
+function pickVoiceByPreference(
+  voices: SpeechSynthesisVoice[],
+  locale: string,
+  language: LanguageCode,
+  voicePreference?: 'female' | 'male',
+): SpeechSynthesisVoice | undefined {
+  const lowerLocale = locale.toLowerCase();
+  const lowerLang = language.toLowerCase();
+  const exactMatches = voices.filter((v) => v.lang.toLowerCase() === lowerLocale);
+  const langMatches =
+    exactMatches.length > 0
+      ? exactMatches
+      : voices.filter((v) => v.lang.toLowerCase().startsWith(lowerLang));
+
+  if (langMatches.length === 0) return undefined;
+
+  const scoreVoice = (v: SpeechSynthesisVoice): number => {
+    const n = `${v.name} ${v.voiceURI}`.toLowerCase();
+    let score = 0;
+    if (v.lang.toLowerCase() === lowerLocale) score += 20;
+    if (/natural|neural|enhanced|premium|google/.test(n)) score += 15;
+    if (voicePreference === 'male') {
+      if (/daniel|oliver|arthur|alex|guy|david|george|ryan|male|en-gb/.test(n)) score += 18;
+      if (/samantha|ava|allison|aria|jenny|karen|victoria|female/.test(n)) score -= 6;
+    } else if (voicePreference === 'female') {
+      if (/samantha|ava|allison|aria|jenny|karen|victoria|luciana|yuna|kyoko|female/.test(n)) score += 18;
+      if (/daniel|oliver|arthur|alex|guy|david|male/.test(n)) score -= 6;
+    } else if (/samantha|ava|allison|daniel|aria|jenny|guy|luciana|yuna|kyoko/.test(n)) {
+      score += 12;
+    }
+    if (v.localService) score += 2;
+    return score;
+  };
+
+  return [...langMatches].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
+}
+
+/**
+ * Speaks text with real-time lip-sync callbacks (`onMouthLevel(0..3)`):
+ * - Uses native `utter.onboundary` word events where supported
+ * - Adds a lightweight cadence fallback so avatar lips animate smoothly on ALL browsers (iOS/Android/Desktop)
+ * - Returns a clean `cancel()` function that halts audio & animation instantaneously (zero echo!)
+ */
+export function speakTextWithLipSync(
+  text: string,
+  language: LanguageCode,
+  options: {
+    rate?: number;
+    voicePreference?: 'female' | 'male';
+    onStart?: () => void;
+    onMouthLevel?: (level: 0 | 1 | 2 | 3) => void;
+    onEnd?: () => void;
+  } = {},
+): () => void {
+  const rate = options.rate ?? 0.95;
+  let cancelled = false;
+  let cadenceTimer: ReturnType<typeof setInterval> | null = null;
+  let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+  let startDelayTimer: ReturnType<typeof setTimeout> | null = null;
+  let ended = false;
+
+  const stopCadence = () => {
+    if (cadenceTimer) {
+      clearInterval(cadenceTimer);
+      cadenceTimer = null;
+    }
+    if (safetyTimer) {
+      clearTimeout(safetyTimer);
+      safetyTimer = null;
+    }
+    if (startDelayTimer) {
+      clearTimeout(startDelayTimer);
+      startDelayTimer = null;
+    }
+  };
+
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    stopCadence();
+    options.onMouthLevel?.(0);
+    if (!cancelled) options.onEnd?.();
+  };
+
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text.trim()) {
+    finish();
+    return () => {
+      cancelled = true;
+      stopCadence();
+    };
+  }
+
+  try {
+    const wasSpeaking = window.speechSynthesis.speaking || window.speechSynthesis.pending;
+    stopSpeaking();
+
+    const trigger = () => {
+      if (cancelled) return;
+      const utter = new SpeechSynthesisUtterance(text);
+      const locale = LANGUAGES[language].speechLocale;
+      utter.lang = locale;
+      utter.rate = rate;
+
+      const voices = refreshVoices();
+      const match = pickVoiceByPreference(voices, locale, language, options.voicePreference);
+      if (match) utter.voice = match;
+
+      let step = 0;
+      const pattern: Array<0 | 1 | 2 | 3> = [2, 3, 1, 2, 3, 2, 1, 0];
+
+      const startCadence = () => {
+        if (cancelled || cadenceTimer) return;
+        options.onStart?.();
+        cadenceTimer = setInterval(() => {
+          if (cancelled) return;
+          const lvl = pattern[step % pattern.length]!;
+          step += 1;
+          options.onMouthLevel?.(lvl);
+        }, Math.max(85, Math.round(135 / Math.max(0.65, rate))));
+      };
+
+      utter.onstart = () => {
+        startCadence();
+      };
+
+      utter.onboundary = () => {
+        if (cancelled) return;
+        // Accentuate mouth open on each spoken word boundary
+        options.onMouthLevel?.(step % 2 === 0 ? 3 : 2);
+        step += 1;
+      };
+
+      utter.onend = () => finish();
+      utter.onerror = () => finish();
+
+      // Safety cap in case a mobile browser fails to fire `onend`
+      const estimatedMs = Math.max(3500, Math.min(28_000, (text.length * 85) / Math.max(0.6, rate) + 2500));
+      safetyTimer = setTimeout(() => {
+        finish();
+      }, estimatedMs);
+
+      window.speechSynthesis.speak(utter);
+      // Some Android browsers start speaking without firing `onstart` immediately
+      setTimeout(() => {
+        if (!cancelled && !ended && !cadenceTimer) {
+          startCadence();
+        }
+      }, 220);
+    };
+
+    if (wasSpeaking) {
+      startDelayTimer = setTimeout(trigger, 40);
+    } else {
+      trigger();
+    }
+  } catch {
+    finish();
+  }
+
+  return () => {
+    cancelled = true;
+    stopCadence();
+    options.onMouthLevel?.(0);
+    stopSpeaking();
+  };
+}
+
 export function speakText(
   text: string,
   language: LanguageCode,

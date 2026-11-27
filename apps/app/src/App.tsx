@@ -537,6 +537,8 @@ export function App() {
                 <ConversationView
                   language={user.activeLanguage}
                   scenarios={courseDetail?.course.scenarios ?? []}
+                  pet={pet}
+                  onPetHappinessChange={handlePetHappinessChange}
                 />
               )}
               {tab === 'review' && (
