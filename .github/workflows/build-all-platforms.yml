@@ -39,6 +39,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
+      - run: pnpm --filter @naidioma/shared build
       - run: pnpm db:generate
       - run: pnpm typecheck
       - run: pnpm build

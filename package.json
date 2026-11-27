@@ -12,7 +12,7 @@
     "dev:app": "pnpm --filter @naidioma/app dev",
     "build": "pnpm --filter @naidioma/shared build && pnpm --filter @naidioma/app build && pnpm --filter @naidioma/api build",
     "start": "pnpm --filter @naidioma/api start",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @naidioma/shared build && pnpm -r typecheck",
     "test": "pnpm --filter @naidioma/shared test && pnpm --filter @naidioma/api test",
     "db:push": "pnpm --filter @naidioma/api db:push",
     "db:generate": "pnpm --filter @naidioma/api db:generate",
