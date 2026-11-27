@@ -1,4 +1,4 @@
-import webpush from 'web-push';
+import { generateVAPIDKeys, sendNotification, setVapidDetails } from 'web-push';
 import { LANGUAGES, type LanguageCode } from '@naidioma/shared';
 import { config } from '../lib/config.js';
 import { prisma } from '../lib/prisma.js';
@@ -38,7 +38,7 @@ export async function getOrCreateVapidKeys(): Promise<VapidKeys> {
     }
   }
 
-  const generated = webpush.generateVAPIDKeys();
+  const generated = generateVAPIDKeys();
   cachedVapid = { publicKey: generated.publicKey, privateKey: generated.privateKey };
   await prisma.runtimeConfig.upsert({
     where: { key: VAPID_CONFIG_KEY },
@@ -52,7 +52,7 @@ export async function getOrCreateVapidKeys(): Promise<VapidKeys> {
 
 function applyVapidDetails(keys: VapidKeys) {
   const contactEmail = config.emailFrom.match(/<([^>]+)>/)?.[1] ?? 'contato@naidioma.com.br';
-  webpush.setVapidDetails(`mailto:${contactEmail}`, keys.publicKey, keys.privateKey);
+  setVapidDetails(`mailto:${contactEmail}`, keys.publicKey, keys.privateKey);
 }
 
 const MOTIVATIONAL_REMINDERS: Array<
@@ -115,7 +115,7 @@ export async function sendPushNotificationToSubscription(
 ): Promise<{ sent: boolean; expired?: boolean; error?: string }> {
   await getOrCreateVapidKeys();
   try {
-    await webpush.sendNotification(
+    await sendNotification(
       {
         endpoint: sub.endpoint,
         keys: { p256dh: sub.p256dh, auth: sub.auth },

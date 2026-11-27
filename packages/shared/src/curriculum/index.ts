@@ -17,16 +17,38 @@ import {
   JAPANESE_COURSE,
   KOREAN_COURSE,
 } from './asian.js';
+import { buildDailyLifeUnits } from './daily-life.js';
+
+function enrichCourseWithDailyLife(base: LanguageCourse): LanguageCourse {
+  const daily = buildDailyLifeUnits(base.meta.code);
+  const firstUnit = base.units[0];
+  const remainingUnits = base.units.slice(1);
+  // Coloca Casa/Cozinha/Mercado e Escola/Criança/Trabalho logo após a Etapa 1 inicial!
+  const mergedUnits = [
+    ...(firstUnit ? [firstUnit] : []),
+    ...daily.units,
+    ...remainingUnits,
+  ].map((unit, idx) => ({
+    ...unit,
+    order: idx + 1,
+  }));
+
+  return {
+    ...base,
+    units: mergedUnits,
+    scenarios: [...daily.scenarios, ...base.scenarios],
+  };
+}
 
 export const COURSES: Record<LanguageCode, LanguageCourse> = {
-  en: ENGLISH_COURSE,
-  es: SPANISH_COURSE,
-  fr: FRENCH_COURSE,
-  de: GERMAN_COURSE,
-  it: ITALIAN_COURSE,
-  ja: JAPANESE_COURSE,
-  zh: CHINESE_COURSE,
-  ko: KOREAN_COURSE,
+  en: enrichCourseWithDailyLife(ENGLISH_COURSE),
+  es: enrichCourseWithDailyLife(SPANISH_COURSE),
+  fr: enrichCourseWithDailyLife(FRENCH_COURSE),
+  de: enrichCourseWithDailyLife(GERMAN_COURSE),
+  it: enrichCourseWithDailyLife(ITALIAN_COURSE),
+  ja: enrichCourseWithDailyLife(JAPANESE_COURSE),
+  zh: enrichCourseWithDailyLife(CHINESE_COURSE),
+  ko: enrichCourseWithDailyLife(KOREAN_COURSE),
 };
 
 export function getCourse(language: LanguageCode): LanguageCourse {
