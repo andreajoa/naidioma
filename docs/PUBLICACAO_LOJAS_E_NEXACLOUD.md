@@ -1,13 +1,15 @@
-# Guia de Publicação 100% Online — NAidioma (NexaCloud + PostgreSQL + Android + Apple iOS + Stripe + Ollama)
+# Guia de Publicação 100% Online — NAidioma (NexaCloud + Cloudflare Sync + Android + Apple iOS + Stripe + Ollama)
 
-Tudo no **NAidioma** foi desenhado para rodar **100% online na nuvem**, sem depender de máquina local.
+Tudo no **NAidioma** foi desenhado para rodar **100% online na nuvem**, sem depender de máquina local e **sem Neon** (sem bloqueios por horas de computação).
 
-## 1. Deploy no NexaCloud (API + Web App / PWA juntos)
-1. Conecte o repositório público `naidioma` no **NexaCloud**.
-2. Provisione um banco **PostgreSQL** (NexaCloud Postgres, Neon ou Supabase) e copie a string para `DATABASE_URL`.
+## 1. Deploy no NexaCloud (API + Web App / PWA + Persistência Cloudflare)
+1. Conecte o repositório público `naidioma` no **NexaCloud** (`framework: server`, Node 22).
+2. A persistência de banco roda em **SQLite em disco rápido + replicação automática criptografada (AES-256-GCM) no Cloudflare Private KV do NexaCloud** a cada escrita, no cron `/api/cron/backup` e no encerramento do container, com restauração automática no boot (`cloud-restore.js`).
 3. Configure as variáveis de ambiente baseadas em `apps/api/.env.example`:
-   - `DATABASE_URL`: string `postgresql://...`
-   - `APP_PUBLIC_URL`: domínio público (ex.: `https://naidioma.com.br`)
+   - `DATABASE_URL`: `file:/app/data/naidioma.db`
+   - `CLOUD_SYNC_URL`: `https://app.nexaclouds.online/api/customer/projects/naidioma/kv`
+   - `CLOUD_SYNC_TOKEN`: token privado do projeto no NexaCloud
+   - `APP_PUBLIC_URL`: domínio público (ex.: `https://naidioma.nexaclouds.online` ou `https://naidioma.com.br`)
    - `JWT_SECRET` e `ADMIN_API_KEY`: chaves fortes aleatórias
    - `FREE_BETA_MODE="true"` e `BILLING_UI_ENABLED="false"` (mantém 100% gratuito e sem preços visíveis no beta)
    - `EMAIL_FROM="NAidioma <contato@naidioma.com.br>"` + `RESEND_API_KEY` ou `BREVO_API_KEY`

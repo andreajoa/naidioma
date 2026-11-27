@@ -26,8 +26,8 @@ let lastCloudSyncAt: string | null = null;
 let lastCloudSyncError: string | null = null;
 
 function getSyncConfig(): { baseUrl: string; token: string } | null {
-  const baseUrl = (process.env.NEXACLOUD_SYNC_URL ?? '').trim().replace(/\/+$/, '');
-  const token = (process.env.NEXACLOUD_SYNC_TOKEN ?? '').trim();
+  const baseUrl = (process.env.CLOUD_SYNC_URL ?? '').trim().replace(/\/+$/, '');
+  const token = (process.env.CLOUD_SYNC_TOKEN ?? '').trim();
   if (!baseUrl || !token) return null;
   return { baseUrl, token };
 }

@@ -2,7 +2,7 @@
 
 Plataforma completa e cutting-edge de aprendizado de **8 idiomas** (Inglês para Brasileiros em destaque, Espanhol, Francês, Alemão, Italiano, Japonês, Chinês Mandarim e Coreano) na paleta visual oficial do **Núcleo Afetar** (`nucleoafetar.com.br`).
 
-**100% online na nuvem** — banco **PostgreSQL em nuvem**, deploy pronto no **NexaCloud**, IA na nuvem (**Ollama Cloud / Kaggle GPU T4 x2** com fallback 24/7), e-mail profissional (**Resend / Brevo**), **Stripe** conectado (oculto até liberação) e builds automáticos de **Android** e **Apple iOS** no GitHub Actions.
+**100% online na nuvem** — deploy pronto no **NexaCloud** com **persistência automática criptografada (AES-256-GCM) no Cloudflare Private KV** (zero Neon, sem risco de bloqueio por limite de horas), IA na nuvem (**Ollama Cloud / Kaggle GPU T4 x2** com fallback 24/7), e-mail profissional (**Resend / Brevo**), **Stripe** conectado (oculto até liberação) e builds automáticos de **Android** e **Apple iOS** no GitHub Actions.
 
 ## Recursos Principais
 - **Cadastro obrigatório + Mailing LGPD:** captura nome, e-mail, WhatsApp opcional, idioma de interesse e origem (`utm_source` / `nucleoafetar`), envia e-mail profissional de boas-vindas e permite baixar o **Mailing CSV** direto no Painel Admin.
@@ -15,11 +15,11 @@ Plataforma completa e cutting-edge de aprendizado de **8 idiomas** (Inglês para
 
 ## Deploy 100% Online no NexaCloud
 1. Conecte este repositório no **NexaCloud** (o `Dockerfile` e `nexacloud.json` já sobem API + Web App/PWA na porta `3000`).
-2. Configure o banco **PostgreSQL** (`DATABASE_URL`) e as variáveis listadas em `apps/api/.env.example`.
-3. O deploy executa automaticamente `prisma db push` na nuvem e publica o site/PWA.
+2. Configure `DATABASE_URL="file:/app/data/naidioma.db"`, `CLOUD_SYNC_URL` e `CLOUD_SYNC_TOKEN` (Cloudflare Private KV do NexaCloud) e as variáveis listadas em `apps/api/.env.example`.
+3. O container restaura automaticamente o último snapshot criptografado do Cloudflare no boot, executa `prisma db push` e replica todas as alterações continuamente para a nuvem Cloudflare.
 
 ## Builds na Nuvem para Android e Apple iOS
 O workflow `.github/workflows/build-all-platforms.yml` compila automaticamente na nuvem:
-- Testes + API + Web/PWA com PostgreSQL real;
+- Testes + API + Web/PWA com camada de persistência Cloudflare;
 - App **Android** (`.apk` pronto para instalar/testar e `.aab` para Google Play);
 - App **Apple iOS** (compilado em runner macOS Xcode com Swift Package Manager).
