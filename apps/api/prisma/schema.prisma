@@ -24,6 +24,26 @@ model User {
   longestStreak         Int       @default(0)
   lastStudyDate         String?   // YYYY-MM-DD
 
+  // Location & Device Telemetry (auto-detected via Cloudflare/IP or optionally declared by user)
+  city                  String?
+  region                String?
+  country               String?
+  timezone              String?
+  locationSource        String?   // user | cloudflare | ip
+  visitorId             String?
+
+  // Active Usage Telemetry
+  totalTimeSeconds      Int       @default(0)
+  sessionsCount         Int       @default(0)
+  lastActiveAt          DateTime?
+  lastPlatform          String?   // web | pwa | android | ios
+  lastDeviceType        String?   // mobile | tablet | desktop
+  lastOs                String?
+  lastBrowser           String?
+  pwaInstalled          Boolean   @default(false)
+  calmModeEnabled       Boolean   @default(false)
+  soundEnabled          Boolean   @default(true)
+
   // Mailing & Email Marketing (LGPD compliant)
   marketingOptIn        Boolean   @default(true)
   marketingOptInAt      DateTime?
@@ -49,26 +69,36 @@ model User {
   feedbacks             BetaFeedback[]
   aiUsage               AiUsageDaily[]
   pushSubscriptions     PushSubscription[]
+  visitorSessions       VisitorSession[]
+  analyticsEvents       AnalyticsEvent[]
 
   @@index([marketingOptIn, activeLanguage])
   @@index([leadSource, createdAt])
+  @@index([country, region, city])
+  @@index([lastActiveAt])
+  @@index([createdAt])
 }
 
 model LessonProgress {
-  id             String   @id @default(cuid())
-  userId         String
-  language       String
-  lessonId       String
-  bestAccuracy   Int      @default(0)
-  xpEarned       Int      @default(0)
-  completedCount Int      @default(1)
-  completedAt    DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String
+  language             String
+  lessonId             String
+  bestAccuracy         Int      @default(0)
+  lastAccuracy         Int      @default(0)
+  xpEarned             Int      @default(0)
+  completedCount       Int      @default(1)
+  totalDurationSeconds Int      @default(0)
+  lastDurationSeconds  Int      @default(0)
+  completedAt          DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, lessonId])
   @@index([userId, language])
+  @@index([language, bestAccuracy])
+  @@index([completedAt])
 }
 
 model SkillScore {
@@ -180,4 +210,97 @@ model PushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, active])
+}
+
+model VisitorSession {
+  id                String   @id @default(cuid())
+  visitorId         String
+  userId            String?
+  startedAt         DateTime @default(now())
+  lastSeenAt        DateTime @default(now())
+  durationSeconds   Int      @default(0)
+  entryPath         String   @default("/")
+  lastPath          String   @default("/")
+  referrer          String?
+  utmSource         String?
+  utmMedium         String?
+  utmCampaign       String?
+  platform          String   @default("web") // web | pwa | android | ios
+  deviceType        String   @default("desktop") // mobile | tablet | desktop
+  os                String?
+  browser           String?
+  screenWidth       Int?
+  screenHeight      Int?
+  pwaInstalled      Boolean  @default(false)
+  city              String?
+  region            String?
+  country           String?
+  timezone          String?
+  ipHash            String?
+  activeLanguage    String?
+  screensJson       String   @default("{}")
+  eventsCount       Int      @default(1)
+  convertedToSignup Boolean  @default(false)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([startedAt])
+  @@index([lastSeenAt])
+  @@index([visitorId, startedAt])
+  @@index([userId, startedAt])
+  @@index([country, region, city])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  visitorId String
+  sessionId String?
+  userId    String?
+  eventType String
+  language  String?
+  cefr      String?
+  lessonId  String?
+  screen    String?
+  valueNum  Int?
+  metaJson  String?
+  city      String?
+  country   String?
+  platform  String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@index([language, createdAt])
+  @@index([createdAt])
+}
+
+model SavedReport {
+  id          String    @id @default(cuid())
+  title       String
+  periodType  String    @default("30d") // 7d | 30d | 90d | all | custom
+  periodStart DateTime
+  periodEnd   DateTime
+  summaryJson String
+  notes       String?
+  emailedTo   String?
+  emailedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  ipHash    String?
+  city      String?
+  country   String?
+  userAgent String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action, createdAt])
 }

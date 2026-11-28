@@ -4,6 +4,11 @@ import { LanguageCodeSchema, type LanguageCode } from '@naidioma/shared';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, signToken, verifyPassword, verifyToken } from '../lib/auth.js';
 import { sendWelcomeEmail, syncContactToNovaMail } from '../services/email.js';
+import {
+  parseCityRegionInput,
+  parseUserAgent,
+  resolveRequestLocation,
+} from '../services/geo.js';
 
 export function extractBearerToken(req: FastifyRequest): string | null {
   const header = req.headers.authorization;
@@ -24,6 +29,12 @@ const RegisterSchema = z.object({
   password: z.string().min(6, 'A senha precisa ter pelo menos 6 caracteres.').max(100),
   displayName: z.string().trim().min(2, 'Informe seu nome.').max(60),
   whatsapp: z.string().trim().max(30).optional(),
+  city: z.string().trim().max(90).optional(),
+  region: z.string().trim().max(40).optional(),
+  country: z.string().trim().max(8).optional(),
+  timezone: z.string().trim().max(60).optional(),
+  visitorId: z.string().trim().max(80).optional(),
+  platform: z.enum(['web', 'pwa', 'android', 'ios']).optional(),
   activeLanguage: LanguageCodeSchema.default('en'),
   dailyGoalMinutes: z.number().int().min(5).max(60).default(10),
   marketingOptIn: z.boolean().default(true),
@@ -34,11 +45,16 @@ const RegisterSchema = z.object({
 const LoginSchema = z.object({
   email: z.string().trim().email(),
   password: z.string().min(1),
+  visitorId: z.string().trim().max(80).optional(),
+  timezone: z.string().trim().max(60).optional(),
+  platform: z.enum(['web', 'pwa', 'android', 'ios']).optional(),
 });
 
 const PreferencesSchema = z.object({
   displayName: z.string().trim().min(2).max(60).optional(),
   whatsapp: z.string().trim().max(30).optional().nullable(),
+  city: z.string().trim().max(90).optional().nullable(),
+  region: z.string().trim().max(40).optional().nullable(),
   activeLanguage: LanguageCodeSchema.optional(),
   dailyGoalMinutes: z.number().int().min(5).max(60).optional(),
   marketingOptIn: z.boolean().optional(),
@@ -49,6 +65,9 @@ function sanitizeUser(user: {
   email: string;
   displayName: string;
   whatsapp: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
   role: string;
   activeLanguage: string;
   dailyGoalMinutes: number;
@@ -67,6 +86,9 @@ function sanitizeUser(user: {
     email: user.email,
     displayName: user.displayName,
     whatsapp: user.whatsapp,
+    city: user.city,
+    region: user.region,
+    country: user.country,
     role: user.role,
     activeLanguage: user.activeLanguage,
     dailyGoalMinutes: user.dailyGoalMinutes,
@@ -98,8 +120,20 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       });
     }
 
-    const passwordHash = await hashPassword(parsed.data.password);
+    const [passwordHash, geo] = await Promise.all([
+      hashPassword(parsed.data.password),
+      resolveRequestLocation(req, parsed.data.timezone),
+    ]);
+    const userCityParsed = parseCityRegionInput(parsed.data.city, parsed.data.region);
+    const ua = parseUserAgent(
+      typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : '',
+    );
     const now = new Date();
+
+    const finalCity = userCityParsed.city ?? geo.city;
+    const finalRegion = userCityParsed.region ?? geo.region;
+    const finalCountry = parsed.data.country?.toUpperCase() || geo.country || (userCityParsed.city ? 'BR' : null);
+    const locationSource = userCityParsed.city ? 'user' : geo.source;
 
     const user = await prisma.user.create({
       data: {
@@ -107,6 +141,18 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         passwordHash,
         displayName: parsed.data.displayName,
         whatsapp: parsed.data.whatsapp?.trim() || null,
+        city: finalCity,
+        region: finalRegion,
+        country: finalCountry,
+        timezone: geo.timezone,
+        locationSource,
+        visitorId: parsed.data.visitorId || null,
+        sessionsCount: 1,
+        lastActiveAt: now,
+        lastPlatform: parsed.data.platform || 'web',
+        lastDeviceType: ua.deviceType,
+        lastOs: ua.os,
+        lastBrowser: ua.browser,
         activeLanguage: parsed.data.activeLanguage,
         dailyGoalMinutes: parsed.data.dailyGoalMinutes,
         marketingOptIn: parsed.data.marketingOptIn,
@@ -115,6 +161,36 @@ export async function registerAuthRoutes(app: FastifyInstance) {
         utmCampaign: parsed.data.utmCampaign || null,
       },
     });
+
+    // Link anonymous pre-signup sessions and log signup conversion event
+    if (parsed.data.visitorId) {
+      void prisma.visitorSession
+        .updateMany({
+          where: { visitorId: parsed.data.visitorId, userId: null },
+          data: {
+            userId: user.id,
+            convertedToSignup: true,
+            city: finalCity ?? undefined,
+            region: finalRegion ?? undefined,
+            country: finalCountry ?? undefined,
+          },
+        })
+        .catch(() => {});
+    }
+
+    void prisma.analyticsEvent
+      .create({
+        data: {
+          visitorId: parsed.data.visitorId || `user:${user.id}`,
+          userId: user.id,
+          eventType: 'signup_completed',
+          language: user.activeLanguage,
+          city: finalCity,
+          country: finalCountry,
+          platform: parsed.data.platform || 'web',
+        },
+      })
+      .catch(() => {});
 
     // Fire-and-forget welcome email + automatic NovaMail Audience sync (for follow-up/promo campaigns)
     void sendWelcomeEmail({
@@ -162,8 +238,56 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return reply.status(401).send({ error: 'E-mail ou senha incorretos.' });
     }
 
-    const token = signToken(user);
-    return { token, user: sanitizeUser(user) };
+    const geo = await resolveRequestLocation(req, parsed.data.timezone);
+    const ua = parseUserAgent(
+      typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : '',
+    );
+    const now = new Date();
+    const patch: Record<string, unknown> = {
+      lastActiveAt: now,
+      lastPlatform: parsed.data.platform ?? user.lastPlatform ?? 'web',
+      lastDeviceType: ua.deviceType,
+      lastOs: ua.os,
+      lastBrowser: ua.browser,
+    };
+    if (user.locationSource !== 'user' && !user.city && geo.city) {
+      patch.city = geo.city;
+      patch.region = geo.region;
+      patch.country = geo.country;
+      patch.timezone = geo.timezone;
+      patch.locationSource = geo.source;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: patch,
+    });
+
+    if (parsed.data.visitorId) {
+      void prisma.visitorSession
+        .updateMany({
+          where: { visitorId: parsed.data.visitorId, userId: null },
+          data: { userId: user.id },
+        })
+        .catch(() => {});
+    }
+
+    void prisma.analyticsEvent
+      .create({
+        data: {
+          visitorId: parsed.data.visitorId || `user:${user.id}`,
+          userId: user.id,
+          eventType: 'login_completed',
+          language: updatedUser.activeLanguage,
+          city: updatedUser.city,
+          country: updatedUser.country,
+          platform: parsed.data.platform || 'web',
+        },
+      })
+      .catch(() => {});
+
+    const token = signToken(updatedUser);
+    return { token, user: sanitizeUser(updatedUser) };
   });
 
   app.get('/api/me', async (req, reply) => {
@@ -181,9 +305,24 @@ export async function registerAuthRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Preferências inválidas.' });
     }
 
-    const updateData: Record<string, unknown> = { ...parsed.data };
+    const updateData: Record<string, unknown> = {};
+    if (parsed.data.displayName !== undefined) updateData.displayName = parsed.data.displayName;
+    if (parsed.data.whatsapp !== undefined) updateData.whatsapp = parsed.data.whatsapp;
+    if (parsed.data.activeLanguage !== undefined) updateData.activeLanguage = parsed.data.activeLanguage;
+    if (parsed.data.dailyGoalMinutes !== undefined) updateData.dailyGoalMinutes = parsed.data.dailyGoalMinutes;
     if (typeof parsed.data.marketingOptIn === 'boolean') {
+      updateData.marketingOptIn = parsed.data.marketingOptIn;
       updateData.marketingOptInAt = parsed.data.marketingOptIn ? new Date() : null;
+    }
+
+    if (parsed.data.city !== undefined || parsed.data.region !== undefined) {
+      const parsedLoc = parseCityRegionInput(parsed.data.city, parsed.data.region);
+      updateData.city = parsedLoc.city;
+      updateData.region = parsedLoc.region;
+      if (parsedLoc.city) {
+        updateData.locationSource = 'user';
+        if (!user.country) updateData.country = 'BR';
+      }
     }
 
     const updated = await prisma.user.update({

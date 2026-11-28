@@ -72,6 +72,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [
           /^\/api\//,
+          /^\/dashboard(?:\/|$)/,
           /^\/robots\.txt$/,
           /^\/sitemap\.xml$/,
           /^\/llms(?:-full)?\.txt$/,

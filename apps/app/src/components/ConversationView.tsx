@@ -20,6 +20,7 @@ import {
 import { api } from '../lib/api';
 import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
 import { playTapSound } from '../lib/sound';
+import { setTelemetryContext, trackTelemetryEvent } from '../lib/telemetry';
 import {
   createAudioRecorder,
   createSpeechRecognizer,
@@ -88,6 +89,12 @@ export function ConversationView({
     setActiveMode(mode);
     setActiveScenario(scenario);
     setError(null);
+    setTelemetryContext({ screen: mode === 'call' ? 'live_call' : 'conversation', language });
+    trackTelemetryEvent(mode === 'call' ? 'live_call_started' : 'ai_chat_started', {
+      language,
+      cefr: scenario.cefr,
+      screen: mode === 'call' ? 'live_call' : 'conversation',
+    });
     if (mode === 'chat') {
       setMessages([
         {

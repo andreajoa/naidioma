@@ -9,6 +9,7 @@ import {
   DownloadSimple,
   EnvelopeSimple,
   LockSimple,
+  MapPin,
   User,
   WhatsappLogo,
 } from '@phosphor-icons/react';
@@ -18,6 +19,12 @@ import { hapticError, hapticSuccess, hapticTap } from '../lib/native';
 import { usePwaInstall } from '../lib/pwaInstall';
 import { playCorrectSound, playGentleRetrySound, playTapSound } from '../lib/sound';
 import { speakText } from '../lib/speech';
+import {
+  detectClientPlatform,
+  getClientTimezone,
+  getVisitorId,
+  trackTelemetryEvent,
+} from '../lib/telemetry';
 import { FlagSvg, HeroAutismScene } from './HeroAutismScene';
 import { LANGUAGE_FLAGS, PuzzleMascot } from './Mascots';
 
@@ -54,6 +61,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [cityInput, setCityInput] = useState('');
   const [password, setPassword] = useState('');
   const [dailyGoalMinutes, setDailyGoalMinutes] = useState(10);
   const [marketingOptIn, setMarketingOptIn] = useState(true);
@@ -72,6 +80,8 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     playCorrectSound(1);
     setSelectedLang(code);
     speakText(GREETING_BY_LANG[code], code, 0.95);
+    trackTelemetryEvent('onboarding_language_picked', { language: code, screen: 'auth' });
+    trackTelemetryEvent('signup_started', { language: code, screen: 'auth' });
     setError(null);
     setStep('register');
   }
@@ -84,12 +94,20 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     playTapSound();
 
     try {
+      const visitorId = getVisitorId();
+      const timezone = getClientTimezone();
+      const platform = detectClientPlatform();
+
       if (step === 'register') {
         const { leadSource, utmCampaign } = readUrlMarketingParams();
         const user = await api.register({
           displayName,
           email,
           whatsapp: whatsapp.trim() || undefined,
+          city: cityInput.trim() || undefined,
+          timezone,
+          visitorId,
+          platform,
           password,
           activeLanguage: selectedLang,
           dailyGoalMinutes,
@@ -101,7 +119,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
         playCorrectSound(2);
         onAuthenticated(user);
       } else {
-        const user = await api.login({ email, password });
+        const user = await api.login({ email, password, visitorId, timezone, platform });
         void hapticSuccess();
         playCorrectSound(2);
         onAuthenticated(user);
@@ -361,6 +379,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             onClick={() => {
               void hapticTap();
               playCorrectSound(1);
+              trackTelemetryEvent('onboarding_language_picked', {
+                language: selectedLang,
+                screen: 'auth',
+              });
+              trackTelemetryEvent('signup_started', { language: selectedLang, screen: 'auth' });
               setStep('register');
             }}
             className="duo-btn-wine w-full text-base uppercase tracking-wide flex items-center justify-center gap-2"
@@ -479,29 +502,57 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             </div>
 
             {isRegister && (
-              <div>
-                <label
-                  htmlFor="na-whatsapp"
-                  className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
-                >
-                  WhatsApp <span className="font-semibold text-[var(--na-muted)]">(opcional)</span>
-                </label>
-                <div className="relative">
-                  <WhatsappLogo
-                    size={18}
-                    weight="bold"
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
-                  />
-                  <input
-                    id="na-whatsapp"
-                    type="tel"
-                    value={whatsapp}
-                    onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="(13) 99999-0000"
-                    className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
-                  />
+              <>
+                <div>
+                  <label
+                    htmlFor="na-whatsapp"
+                    className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
+                  >
+                    WhatsApp <span className="font-semibold text-[var(--na-muted)]">(opcional)</span>
+                  </label>
+                  <div className="relative">
+                    <WhatsappLogo
+                      size={18}
+                      weight="bold"
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
+                    />
+                    <input
+                      id="na-whatsapp"
+                      type="tel"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      placeholder="(13) 99999-0000"
+                      className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <label
+                    htmlFor="na-city"
+                    className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-ink)] mb-1.5"
+                  >
+                    Cidade / Estado{' '}
+                    <span className="font-semibold text-[var(--na-muted)]">(opcional)</span>
+                  </label>
+                  <div className="relative">
+                    <MapPin
+                      size={18}
+                      weight="bold"
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
+                    />
+                    <input
+                      id="na-city"
+                      type="text"
+                      maxLength={90}
+                      value={cityInput}
+                      onChange={(e) => setCityInput(e.target.value)}
+                      placeholder="Ex.: São Paulo - SP"
+                      className="w-full min-h-[50px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             <div>

@@ -8,6 +8,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { config } from './lib/config.js';
 import { prisma } from './lib/prisma.js';
+import { registerAdminDashboardRoutes } from './routes/admin-dashboard.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBillingRoutes } from './routes/billing.js';
@@ -15,7 +16,9 @@ import { registerCourseRoutes } from './routes/courses.js';
 import { registerFeedbackAndAdminRoutes } from './routes/feedback-admin.js';
 import { registerPushRoutes } from './routes/push.js';
 import { registerSeoRoutes } from './routes/seo.js';
+import { registerTelemetryRoutes } from './routes/telemetry.js';
 import { getAiCapabilities } from './services/ai-gateway.js';
+import { generateAndSaveReport, pruneOldTelemetryEvents } from './services/analytics.js';
 import { getActiveEmailProvider } from './services/email.js';
 import {
   getCloudSyncStatus,
@@ -51,6 +54,15 @@ export async function buildServer() {
     },
   );
 
+  // Allow navigator.sendBeacon text/plain telemetry payloads
+  app.addContentTypeParser(
+    'text/plain',
+    { parseAs: 'string' },
+    (_req, body, done) => {
+      done(null, typeof body === 'string' ? body : '');
+    },
+  );
+
   await app.register(helmet, {
     contentSecurityPolicy: false, // SPA + Capacitor + Web Speech API compatibility
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -76,6 +88,16 @@ export async function buildServer() {
   await app.register(rateLimit, {
     max: 180,
     timeWindow: '1 minute',
+  });
+
+  // Protect /dashboard and /api/admin/* from indexing & intermediary caching
+  app.addHook('onSend', (req, reply, payload, done) => {
+    if (req.url.startsWith('/dashboard') || req.url.startsWith('/api/admin')) {
+      reply.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      reply.header('CDN-Cache-Control', 'no-store');
+    }
+    done(null, payload);
   });
 
   app.get('/api/health', async () => {
@@ -118,6 +140,23 @@ export async function buildServer() {
     return sendDailyStudyReminders();
   });
 
+  app.get('/api/cron/weekly-report', async () => {
+    const [generated, prunedEvents] = await Promise.all([
+      generateAndSaveReport({
+        title: `Relatório Semanal Automático · ${new Date().toISOString().slice(0, 10)}`,
+        periodType: '7d',
+        sendEmailTo: config.adminReportEmail || undefined,
+      }),
+      pruneOldTelemetryEvents(180),
+    ]);
+    return {
+      ok: true,
+      reportId: generated.report.id,
+      emailed: Boolean(generated.emailResult?.sent),
+      prunedEvents,
+    };
+  });
+
   // Automatically replicate every successful write mutation to Cloudflare (NexaCloud Private KV)
   app.addHook('onResponse', (req, reply, done) => {
     if (
@@ -139,6 +178,8 @@ export async function buildServer() {
   await registerAiRoutes(app);
   await registerBillingRoutes(app);
   await registerFeedbackAndAdminRoutes(app);
+  await registerAdminDashboardRoutes(app);
+  await registerTelemetryRoutes(app);
   await registerPushRoutes(app);
   await registerSeoRoutes(app);
 
@@ -165,6 +206,17 @@ export async function buildServer() {
         }
       },
     });
+
+    const serveAdminShell = (_req: unknown, reply: { header: (k: string, v: string) => unknown; sendFile: (f: string) => unknown }) => {
+      reply.header('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      reply.header('CDN-Cache-Control', 'no-store');
+      return reply.sendFile('index.html');
+    };
+
+    app.get('/dashboard', serveAdminShell);
+    app.get('/dashboard/', serveAdminShell);
+    app.get('/dashboard/*', serveAdminShell);
 
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) {

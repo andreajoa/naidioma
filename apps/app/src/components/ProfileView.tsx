@@ -4,8 +4,8 @@ import {
   DownloadSimple,
   EnvelopeSimple,
   Fire,
-  GearSix,
   Leaf,
+  MapPin,
   PuzzlePiece,
   SignOut,
   SpeakerHigh,
@@ -33,7 +33,6 @@ interface ProfileViewProps {
   billing: BillingStatusResponse | null;
   onUserUpdated: (user: UserProfile) => void;
   onOpenBilling: () => void;
-  onOpenAdmin: () => void;
   onLogout: () => void;
 }
 
@@ -43,10 +42,12 @@ export function ProfileView({
   billing,
   onUserUpdated,
   onOpenBilling,
-  onOpenAdmin,
   onLogout,
 }: ProfileViewProps) {
   const [dailyGoal, setDailyGoal] = useState(user.dailyGoalMinutes);
+  const [cityInput, setCityInput] = useState(
+    user.city ? (user.region ? `${user.city} - ${user.region}` : user.city) : '',
+  );
   const [marketingOptIn, setMarketingOptIn] = useState(user.marketingOptIn);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [calmMode, setCalmMode] = useState(() => isCalmModeEnabled());
@@ -62,6 +63,7 @@ export function ProfileView({
     try {
       const res = await api.updatePreferences({
         dailyGoalMinutes: dailyGoal,
+        city: cityInput.trim() || null,
         marketingOptIn,
       });
       void hapticSuccess();
@@ -237,9 +239,34 @@ export function ProfileView({
         </section>
       )}
 
-      {/* Preferências & LGPD */}
+      {/* Preferências, Cidade & LGPD */}
       <section className="duo-card p-5 sm:p-6 space-y-5">
-        <h2 className="font-display text-xl text-[var(--na-ink)]">Meta diária & E-mail</h2>
+        <h2 className="font-display text-xl text-[var(--na-ink)]">Meta diária, Cidade &amp; E-mail</h2>
+
+        <div>
+          <label
+            htmlFor="na-profile-city"
+            className="block text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)] mb-2"
+          >
+            Sua Cidade / Estado (opcional)
+          </label>
+          <div className="relative">
+            <MapPin
+              size={18}
+              weight="bold"
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--na-muted)]"
+            />
+            <input
+              id="na-profile-city"
+              type="text"
+              maxLength={90}
+              value={cityInput}
+              onChange={(e) => setCityInput(e.target.value)}
+              placeholder="Ex.: São Paulo - SP"
+              className="w-full min-h-[46px] pl-10 pr-4 rounded-2xl bg-[var(--na-cream)] border-2 border-[var(--na-border)] text-sm font-semibold text-[var(--na-ink)] focus:border-[var(--na-teal)]"
+            />
+          </div>
+        </div>
 
         <div>
           <div className="text-xs font-extrabold uppercase tracking-wider text-[var(--na-muted)] mb-2">
@@ -291,18 +318,12 @@ export function ProfileView({
         </button>
       </section>
 
-      {/* Versão & Painel Admin */}
+      {/* Versão do App */}
       <section className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs font-bold text-[var(--na-muted)]">
         <span className="font-mono-code">
           NAidioma v{APP_CLIENT_VERSION} · {getPlatform()}
         </span>
-        <button
-          type="button"
-          onClick={onOpenAdmin}
-          className="inline-flex items-center gap-1.5 font-extrabold text-[var(--na-muted)] hover:text-[var(--na-burgundy)] py-2"
-        >
-          <GearSix size={15} weight="bold" /> Painel Admin
-        </button>
+        <span>Núcleo Afetar · 100% Grátis até a Fluência</span>
       </section>
     </div>
   );

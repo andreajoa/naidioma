@@ -142,7 +142,8 @@ export async function registerCourseRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'Payload de conclusão inválido.' });
     }
 
-    const { accuracy } = parsed.data;
+    const { accuracy, durationSeconds } = parsed.data;
+    const safeDuration = Math.max(0, durationSeconds ?? 0);
     const { language, lesson } = found;
     const course = getCourse(language);
 
@@ -182,18 +183,24 @@ export async function registerCourseRoutes(app: FastifyInstance) {
         language,
         lessonId,
         bestAccuracy: accuracy,
+        lastAccuracy: accuracy,
         xpEarned: xpGained,
         completedCount: 1,
+        totalDurationSeconds: safeDuration,
+        lastDurationSeconds: safeDuration,
       },
       update: {
         bestAccuracy: Math.max(existing?.bestAccuracy ?? 0, accuracy),
+        lastAccuracy: accuracy,
         xpEarned: (existing?.xpEarned ?? 0) + xpGained,
         completedCount: { increment: 1 },
+        totalDurationSeconds: { increment: safeDuration },
+        lastDurationSeconds: safeDuration,
         completedAt: new Date(),
       },
     });
 
-    // Update streak
+    // Update streak & activity timestamp
     const today = todayDateKey();
     const yesterday = yesterdayDateKey();
     let streakDays = user.streakDays;
@@ -209,8 +216,31 @@ export async function registerCourseRoutes(app: FastifyInstance) {
         streakDays,
         longestStreak,
         lastStudyDate: today,
+        lastActiveAt: new Date(),
       },
     });
+
+    void prisma.analyticsEvent
+      .create({
+        data: {
+          visitorId: user.visitorId || `user:${user.id}`,
+          userId: user.id,
+          eventType: lesson.isLevelExam
+            ? passedExam
+              ? 'exam_passed'
+              : 'exam_failed'
+            : 'lesson_completed',
+          language,
+          cefr: lesson.cefr,
+          lessonId,
+          screen: 'lesson',
+          valueNum: accuracy,
+          city: user.city,
+          country: user.country,
+          platform: user.lastPlatform ?? 'web',
+        },
+      })
+      .catch(() => {});
 
     // Update 5-dimension skill scores
     const currentSkill = await prisma.skillScore.findUnique({
@@ -354,8 +384,24 @@ export async function registerCourseRoutes(app: FastifyInstance) {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { xpTotal: { increment: 5 } },
+      data: { xpTotal: { increment: 5 }, lastActiveAt: now },
     });
+
+    void prisma.analyticsEvent
+      .create({
+        data: {
+          visitorId: user.visitorId || `user:${user.id}`,
+          userId: user.id,
+          eventType: 'review_completed',
+          language: parsed.data.language,
+          screen: 'review',
+          valueNum: parsed.data.rating,
+          city: user.city,
+          country: user.country,
+          platform: user.lastPlatform ?? 'web',
+        },
+      })
+      .catch(() => {});
 
     return {
       cardId,

@@ -8,6 +8,9 @@ export interface AppConfig {
   serveWebDist: boolean;
   jwtSecret: string;
   adminApiKey: string;
+  adminDashboardPasswordHash: string;
+  adminDashboardPassword: string;
+  adminReportEmail: string;
   freeBetaMode: boolean;
   billingUiEnabled: boolean;
   dailyFreeAiTurns: number;
@@ -54,6 +57,9 @@ export const config: AppConfig = {
   serveWebDist: (process.env.SERVE_WEB_DIST ?? 'true').toLowerCase() !== 'false',
   jwtSecret: resolveSecret('JWT_SECRET'),
   adminApiKey: resolveSecret('ADMIN_API_KEY'),
+  adminDashboardPasswordHash: (process.env.ADMIN_DASHBOARD_PASSWORD_HASH ?? '').trim(),
+  adminDashboardPassword: (process.env.ADMIN_DASHBOARD_PASSWORD ?? '').trim(),
+  adminReportEmail: (process.env.ADMIN_REPORT_EMAIL ?? '').trim(),
   freeBetaMode: (process.env.FREE_BETA_MODE ?? 'true').toLowerCase() !== 'false',
   billingUiEnabled: (process.env.BILLING_UI_ENABLED ?? 'false').toLowerCase() === 'true',
   dailyFreeAiTurns: Number(process.env.DAILY_FREE_AI_TURNS ?? 60),

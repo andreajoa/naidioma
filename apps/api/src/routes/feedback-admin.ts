@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
   FeedbackCategorySchema,
@@ -7,6 +7,7 @@ import {
 } from '@naidioma/shared';
 import { config } from '../lib/config.js';
 import { prisma } from '../lib/prisma.js';
+import { isAuthorizedAdmin } from '../services/admin-auth.js';
 import { pingOllamaEndpoint } from '../services/ai-gateway.js';
 import {
   bulkSyncContactsToNovaMail,
@@ -45,15 +46,6 @@ const UpdateRuntimeConfigSchema = z.object({
   androidStoreUrl: z.string().max(300).optional(),
   iosStoreUrl: z.string().max(300).optional(),
 });
-
-async function isAuthorizedAdmin(req: FastifyRequest): Promise<boolean> {
-  const headerKey = req.headers['x-admin-key'];
-  if (typeof headerKey === 'string' && headerKey === config.adminApiKey) {
-    return true;
-  }
-  const user = await requireUser(req);
-  return user?.role === 'admin';
-}
 
 function csvEscape(value: string | number | boolean | null | undefined): string {
   const str = String(value ?? '');

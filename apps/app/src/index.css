@@ -510,3 +510,20 @@ html.calm-mode .animate-na-sparkle {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #1e1a1d !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

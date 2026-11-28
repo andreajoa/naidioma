@@ -36,6 +36,9 @@ export interface UserProfile {
   email: string;
   displayName: string;
   whatsapp: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
   role: string;
   activeLanguage: LanguageCode;
   dailyGoalMinutes: number;
@@ -48,6 +51,331 @@ export interface UserProfile {
   subscriptionTier: string;
   subscriptionPlanKey: string | null;
   subscriptionExpiresAt: string | null;
+}
+
+export interface AdminUserLanguageStanding {
+  language: LanguageCode;
+  languageNamePt: string;
+  currentCefr: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  highestPassedCefr: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | null;
+  levelProgressPct: number;
+  completedLessons: number;
+  masteredLessons: number;
+  totalCourseLessons: number;
+  averageAccuracy: number;
+  studySeconds: number;
+  examsPassed: number;
+  fsrsReviews: number;
+  isActive: boolean;
+}
+
+export interface AdminDashboardUserRow {
+  id: string;
+  displayName: string;
+  email: string;
+  whatsapp: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  locationLabel: string;
+  locationSource: string | null;
+  activeLanguage: LanguageCode;
+  activeLanguageNamePt: string;
+  activeCefr: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  activeLevelProgressPct: number;
+  languagesStudied: AdminUserLanguageStanding[];
+  totalTimeSeconds: number;
+  sessionsCount: number;
+  avgSessionSeconds: number;
+  lessonsCompleted: number;
+  examsPassed: number;
+  averageAccuracy: number;
+  fsrsReviewsCount: number;
+  aiTurnsTotal: number;
+  feedbacksCount: number;
+  xpTotal: number;
+  streakDays: number;
+  longestStreak: number;
+  dailyGoalMinutes: number;
+  lastStudyDate: string | null;
+  lastActiveAt: string | null;
+  lastPlatform: string | null;
+  lastDeviceType: string | null;
+  lastOs: string | null;
+  lastBrowser: string | null;
+  pwaInstalled: boolean;
+  calmModeEnabled: boolean;
+  marketingOptIn: boolean;
+  leadSource: string;
+  utmCampaign: string | null;
+  subscriptionTier: string;
+  createdAt: string;
+}
+
+export interface AdminDashboardSummary {
+  generatedAt: string;
+  period: {
+    type: '7d' | '30d' | '90d' | 'all' | 'custom';
+    labelPt: string;
+    start: string;
+    end: string;
+  };
+  kpis: {
+    totalSessions: number;
+    uniqueVisitors: number;
+    anonymousVisitorsOnly: number;
+    totalRegisteredUsers: number;
+    newUsersInPeriod: number;
+    visitorToSignupRate: number;
+    activationRate: number;
+    dau: number;
+    wau: number;
+    mau: number;
+    stickinessPct: number;
+    totalUsageSecondsPeriod: number;
+    totalUsageSecondsAllTime: number;
+    avgSessionSeconds: number;
+    avgSecondsPerUser: number;
+    lessonsCompletedInPeriod: number;
+    totalLessonsCompletedAllTime: number;
+    totalAiTurnsAllTime: number;
+    totalFsrsReviewsAllTime: number;
+    examPassedEvents: number;
+    examFailedEvents: number;
+    pwaInstalledUsers: number;
+    calmModeUsers: number;
+    pushActiveCount: number;
+    optInUsers: number;
+    openFeedbackCount: number;
+  };
+  funnel: Array<{ step: string; count: number; pct: number }>;
+  timeline: Array<{
+    date: string;
+    sessions: number;
+    uniqueVisitors: number;
+    signups: number;
+    lessons: number;
+    minutes: number;
+  }>;
+  hourlyActivity: Array<{ hour: number; sessions: number; minutes: number }>;
+  weekdayActivity: Array<{ dayIndex: number; label: string; sessions: number; minutes: number }>;
+  languageBreakdown: Array<{
+    code: LanguageCode;
+    namePt: string;
+    nativeName: string;
+    accentHex: string;
+    activeUsers: number;
+    totalLearners: number;
+    lessonsCompleted: number;
+    avgAccuracy: number;
+    studyMinutes: number;
+    cefrCounts: Record<'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2', number>;
+  }>;
+  cefrDistribution: Array<{ cefr: string; count: number; pct: number }>;
+  topCities: Array<{
+    city: string;
+    region: string | null;
+    country: string | null;
+    label: string;
+    sessions: number;
+    uniqueVisitors: number;
+    registeredUsers: number;
+    totalMinutes: number;
+  }>;
+  topCountries: Array<{ country: string; sessions: number; registeredUsers: number }>;
+  screenUsage: Array<{
+    screen: string;
+    label: string;
+    seconds: number;
+    minutes: number;
+    pct: number;
+  }>;
+  hardestLessons: Array<{
+    lessonId: string;
+    language: string;
+    titlePt: string;
+    cefr: string;
+    isLevelExam: boolean;
+    completions: number;
+    attempts: number;
+    avgAccuracy: number;
+    avgDurationSeconds: number;
+    abandons: number;
+    retryRatio: number;
+  }>;
+  mostPopularLessons: Array<{
+    lessonId: string;
+    language: string;
+    titlePt: string;
+    cefr: string;
+    isLevelExam: boolean;
+    completions: number;
+    attempts: number;
+    avgAccuracy: number;
+    avgDurationSeconds: number;
+    abandons: number;
+    retryRatio: number;
+  }>;
+  devices: {
+    platforms: Array<{ name: string; count: number }>;
+    deviceTypes: Array<{ name: string; count: number }>;
+    os: Array<{ name: string; count: number }>;
+    browsers: Array<{ name: string; count: number }>;
+  };
+  acquisition: {
+    entryPages: Array<{ name: string; count: number }>;
+    sources: Array<{ name: string; count: number }>;
+  };
+  churnRiskUsers: Array<{
+    id: string;
+    displayName: string;
+    email: string;
+    locationLabel: string;
+    activeLanguage: LanguageCode;
+    activeCefr: string;
+    lessonsCompleted: number;
+    totalTimeSeconds: number;
+    lastActiveAt: string;
+  }>;
+  powerUsers: Array<{
+    id: string;
+    displayName: string;
+    email: string;
+    locationLabel: string;
+    activeLanguage: LanguageCode;
+    activeCefr: string;
+    lessonsCompleted: number;
+    totalTimeSeconds: number;
+    xpTotal: number;
+    streakDays: number;
+  }>;
+  recommendations: Array<{
+    id: string;
+    severity: 'high' | 'medium' | 'info';
+    area: string;
+    title: string;
+    detail: string;
+    metricBadge: string;
+  }>;
+}
+
+export interface AdminUserDetailResponse {
+  profile: AdminDashboardUserRow;
+  skillsByLanguage: Array<{
+    language: string;
+    speaking: number;
+    listening: number;
+    reading: number;
+    writing: number;
+    vocabulary: number;
+  }>;
+  screenTimeSeconds: Record<string, number>;
+  recentSessions: Array<{
+    id: string;
+    startedAt: string;
+    lastSeenAt: string;
+    durationSeconds: number;
+    entryPath: string;
+    platform: string;
+    deviceType: string;
+    os: string | null;
+    browser: string | null;
+    locationLabel: string;
+    activeLanguage: string | null;
+    screens: Record<string, number>;
+  }>;
+  recentLessons: Array<{
+    lessonId: string;
+    titlePt: string;
+    language: string;
+    cefr: string;
+    bestAccuracy: number;
+    lastAccuracy: number;
+    completedCount: number;
+    totalDurationSeconds: number;
+    completedAt: string;
+  }>;
+  recentEvents: Array<{
+    id: string;
+    eventType: string;
+    language: string | null;
+    cefr: string | null;
+    lessonId: string | null;
+    screen: string | null;
+    valueNum: number | null;
+    createdAt: string;
+  }>;
+  conversations: Array<{
+    id: string;
+    language: string;
+    scenarioId: string;
+    turnsCount: number;
+    avgNaturalness: number;
+    createdAt: string;
+  }>;
+  feedbacks: Array<{
+    id: string;
+    category: string;
+    message: string;
+    status: string;
+    createdAt: string;
+  }>;
+}
+
+export interface AdminVisitorSessionRow {
+  id: string;
+  visitorId: string;
+  userId: string | null;
+  user: {
+    id: string;
+    displayName: string;
+    email: string;
+    activeLanguage: string;
+  } | null;
+  startedAt: string;
+  lastSeenAt: string;
+  durationSeconds: number;
+  entryPath: string;
+  lastPath: string;
+  referrer: string | null;
+  utmSource: string | null;
+  utmCampaign: string | null;
+  platform: string;
+  deviceType: string;
+  os: string | null;
+  browser: string | null;
+  pwaInstalled: boolean;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  timezone: string | null;
+  activeLanguage: string | null;
+  eventsCount: number;
+  convertedToSignup: boolean;
+}
+
+export interface AdminSavedReportListItem {
+  id: string;
+  title: string;
+  periodType: string;
+  periodStart: string;
+  periodEnd: string;
+  notes: string | null;
+  emailedTo: string | null;
+  emailedAt: string | null;
+  createdAt: string;
+  kpis: Record<string, number>;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  action: string;
+  city: string | null;
+  country: string | null;
+  ipHash: string | null;
+  userAgent: string | null;
+  detail: string | null;
+  createdAt: string;
 }
 
 export interface CourseOverviewItem extends LanguageMeta {
@@ -130,14 +458,18 @@ export async function clearAuthToken(): Promise<void> {
 
 async function request<T>(
   path: string,
-  options: RequestInit & { adminKey?: string } = {},
+  options: RequestInit & { adminKey?: string; adminToken?: string } = {},
 ): Promise<T> {
-  const token = await getAuthToken();
+  const token = options.adminToken ? null : await getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (options.adminToken) {
+    headers['Authorization'] = `Bearer ${options.adminToken}`;
+  } else if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   if (options.adminKey) headers['x-admin-key'] = options.adminKey;
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -196,6 +528,11 @@ export const api = {
     password: string;
     displayName: string;
     whatsapp?: string;
+    city?: string;
+    region?: string;
+    timezone?: string;
+    visitorId?: string;
+    platform?: 'web' | 'pwa' | 'android' | 'ios';
     activeLanguage: LanguageCode;
     dailyGoalMinutes: number;
     marketingOptIn: boolean;
@@ -211,7 +548,13 @@ export const api = {
     return res.user;
   },
 
-  login: async (payload: { email: string; password: string }) => {
+  login: async (payload: {
+    email: string;
+    password: string;
+    visitorId?: string;
+    timezone?: string;
+    platform?: 'web' | 'pwa' | 'android' | 'ios';
+  }) => {
     const res = await request<{ token: string; user: UserProfile }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -238,6 +581,8 @@ export const api = {
   updatePreferences: async (patch: {
     displayName?: string;
     whatsapp?: string | null;
+    city?: string | null;
+    region?: string | null;
     activeLanguage?: LanguageCode;
     dailyGoalMinutes?: number;
     marketingOptIn?: boolean;
@@ -256,6 +601,8 @@ export const api = {
           ...cached,
           ...patch,
           whatsapp: patch.whatsapp === undefined ? cached.whatsapp : patch.whatsapp,
+          city: patch.city === undefined ? cached.city : patch.city,
+          region: patch.region === undefined ? cached.region : patch.region,
         };
         await cacheUserProfile(merged);
         return { user: merged };
@@ -467,7 +814,185 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
-  getAdminOverview: (adminKey: string) =>
+  adminLogin: (password: string) =>
+    request<{
+      authenticated: boolean;
+      token: string;
+      expiresAt: string;
+      mustConfigurePassword: boolean;
+      authSource: string;
+    }>('/api/admin/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+
+  adminGetSession: (adminToken: string) =>
+    request<{
+      authenticated: boolean;
+      auth: {
+        source: string;
+        mustConfigurePassword: boolean;
+        sessionVersion: number;
+        passwordUpdatedAt: string | null;
+      };
+      recentAudits: AdminAuditEntry[];
+    }>('/api/admin/auth/session', { adminToken }),
+
+  adminChangePassword: (adminToken: string, currentPassword: string, newPassword: string) =>
+    request<{ ok: boolean; token: string; expiresAt: string; message: string }>(
+      '/api/admin/auth/change-password',
+      {
+        method: 'POST',
+        adminToken,
+        body: JSON.stringify({ currentPassword, newPassword }),
+      },
+    ),
+
+  adminGetDashboardSummary: (
+    adminToken: string,
+    params?: { range?: string; from?: string; to?: string },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.range) qs.set('range', params.range);
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<AdminDashboardSummary>(`/api/admin/dashboard/summary${suffix}`, { adminToken });
+  },
+
+  adminGetDashboardUsers: (
+    adminToken: string,
+    params?: {
+      search?: string;
+      language?: string;
+      cefr?: string;
+      city?: string;
+      status?: string;
+      sort?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set('search', params.search);
+    if (params?.language) qs.set('language', params.language);
+    if (params?.cefr) qs.set('cefr', params.cefr);
+    if (params?.city) qs.set('city', params.city);
+    if (params?.status) qs.set('status', params.status);
+    if (params?.sort) qs.set('sort', params.sort);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{
+      total: number;
+      page: number;
+      limit: number;
+      items: AdminDashboardUserRow[];
+    }>(`/api/admin/dashboard/users${suffix}`, { adminToken });
+  },
+
+  adminGetDashboardUserDetail: (adminToken: string, userId: string) =>
+    request<AdminUserDetailResponse>(`/api/admin/dashboard/users/${encodeURIComponent(userId)}`, {
+      adminToken,
+    }),
+
+  adminGetDashboardVisitors: (
+    adminToken: string,
+    params?: { range?: string; onlyAnonymous?: boolean; city?: string; limit?: number },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.range) qs.set('range', params.range);
+    if (params?.onlyAnonymous) qs.set('onlyAnonymous', 'true');
+    if (params?.city) qs.set('city', params.city);
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request<{ total: number; sessions: AdminVisitorSessionRow[] }>(
+      `/api/admin/dashboard/visitors${suffix}`,
+      { adminToken },
+    );
+  },
+
+  adminListReports: (adminToken: string) =>
+    request<{ reports: AdminSavedReportListItem[] }>('/api/admin/dashboard/reports', { adminToken }),
+
+  adminCreateReport: (
+    adminToken: string,
+    payload: {
+      title?: string;
+      periodType: '7d' | '30d' | '90d' | 'all' | 'custom';
+      from?: string;
+      to?: string;
+      notes?: string;
+      sendEmailTo?: string;
+    },
+  ) =>
+    request<{
+      report: Omit<AdminSavedReportListItem, 'kpis'>;
+      summary: AdminDashboardSummary;
+      emailResult: { sent: boolean; provider: string; error?: string } | null;
+    }>('/api/admin/dashboard/reports', {
+      method: 'POST',
+      adminToken,
+      body: JSON.stringify(payload),
+    }),
+
+  adminGetReport: (adminToken: string, id: string) =>
+    request<{
+      report: Omit<AdminSavedReportListItem, 'kpis'>;
+      summary: AdminDashboardSummary;
+    }>(`/api/admin/dashboard/reports/${encodeURIComponent(id)}`, { adminToken }),
+
+  adminUpdateReportNotes: (adminToken: string, id: string, notes: string) =>
+    request<{ ok: boolean; notes: string }>(`/api/admin/dashboard/reports/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      adminToken,
+      body: JSON.stringify({ notes }),
+    }),
+
+  adminDeleteReport: (adminToken: string, id: string) =>
+    request<{ ok: boolean }>(`/api/admin/dashboard/reports/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      adminToken,
+      body: JSON.stringify({}),
+    }),
+
+  adminEmailReport: (adminToken: string, id: string, toEmail: string) =>
+    request<{ sent: boolean; provider: string; error?: string }>(
+      `/api/admin/dashboard/reports/${encodeURIComponent(id)}/email`,
+      {
+        method: 'POST',
+        adminToken,
+        body: JSON.stringify({ toEmail }),
+      },
+    ),
+
+  adminDownloadDashboardCsv: async (
+    adminToken: string,
+    type: 'users' | 'visitors' | 'lessons',
+    range = '30d',
+  ): Promise<string> => {
+    const res = await fetch(
+      `${API_BASE}/api/admin/dashboard/export.csv?type=${encodeURIComponent(type)}&range=${encodeURIComponent(range)}`,
+      {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      },
+    );
+    if (!res.ok) throw new Error('Falha ao exportar relatório CSV.');
+    return res.text();
+  },
+
+  adminDownloadDashboardJson: async (adminToken: string, range = '30d'): Promise<string> => {
+    const res = await fetch(
+      `${API_BASE}/api/admin/dashboard/export.json?range=${encodeURIComponent(range)}`,
+      {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      },
+    );
+    if (!res.ok) throw new Error('Falha ao exportar relatório JSON.');
+    return res.text();
+  },
+
+  getAdminOverview: (adminToken: string) =>
     request<{
       metrics: {
         totalUsers: number;
@@ -514,9 +1039,9 @@ export const api = {
         createdAt: string;
         user: { displayName: string; email: string } | null;
       }>;
-    }>('/api/admin/overview', { adminKey }),
+    }>('/api/admin/overview', { adminToken }),
 
-  getAdminMailing: (adminKey: string) =>
+  getAdminMailing: (adminToken: string) =>
     request<{
       total: number;
       contacts: Array<{
@@ -533,28 +1058,28 @@ export const api = {
         subscriptionTier: string;
         createdAt: string;
       }>;
-    }>('/api/admin/mailing', { adminKey }),
+    }>('/api/admin/mailing', { adminToken }),
 
-  downloadMailingCsv: async (adminKey: string): Promise<string> => {
+  downloadMailingCsv: async (adminToken: string): Promise<string> => {
     const res = await fetch(`${API_BASE}/api/admin/mailing.csv`, {
-      headers: { 'x-admin-key': adminKey },
+      headers: { Authorization: `Bearer ${adminToken}` },
     });
     if (!res.ok) throw new Error('Falha ao baixar mailing CSV.');
     return res.text();
   },
 
-  syncMailingToNovaMail: (adminKey: string) =>
+  syncMailingToNovaMail: (adminToken: string) =>
     request<{ ok: boolean; synced: number; totalUsers: number; error?: string }>(
       '/api/admin/mailing/sync-novamail',
       {
         method: 'POST',
-        adminKey,
+        adminToken,
         body: JSON.stringify({}),
       },
     ),
 
   sendAdminEmailCampaign: (
-    adminKey: string,
+    adminToken: string,
     payload: {
       subject: string;
       headline: string;
@@ -573,24 +1098,24 @@ export const api = {
       error?: string;
     }>('/api/admin/email-campaign', {
       method: 'POST',
-      adminKey,
+      adminToken,
       body: JSON.stringify(payload),
     }),
 
-  updateAdminFeedback: (adminKey: string, id: string, status: 'new' | 'in_progress' | 'resolved') =>
+  updateAdminFeedback: (adminToken: string, id: string, status: 'new' | 'in_progress' | 'resolved') =>
     request<{ feedback: unknown }>(`/api/admin/feedback/${id}`, {
       method: 'PATCH',
-      adminKey,
+      adminToken,
       body: JSON.stringify({ status }),
     }),
 
-  saveAdminRuntimeConfig: (adminKey: string, payload: Record<string, unknown>) =>
+  saveAdminRuntimeConfig: (adminToken: string, payload: Record<string, unknown>) =>
     request<{
       saved: boolean;
       ollamaStatus: { reachable: boolean; error?: string; availableModels: string[] };
     }>('/api/admin/ai-config', {
       method: 'POST',
-      adminKey,
+      adminToken,
       body: JSON.stringify(payload),
     }),
 

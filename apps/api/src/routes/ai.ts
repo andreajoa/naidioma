@@ -95,8 +95,24 @@ export async function registerAiRoutes(app: FastifyInstance) {
       }),
       prisma.user.update({
         where: { id: user.id },
-        data: { xpTotal: { increment: 12 } },
+        data: { xpTotal: { increment: 12 }, lastActiveAt: new Date() },
       }),
+      prisma.analyticsEvent
+        .create({
+          data: {
+            visitorId: user.visitorId || `user:${user.id}`,
+            userId: user.id,
+            eventType: 'ai_chat_turn',
+            language: scenario.language,
+            cefr: scenario.cefr,
+            screen: 'conversation',
+            valueNum: result.coach.naturalnessScore,
+            city: user.city,
+            country: user.country,
+            platform: user.lastPlatform ?? 'web',
+          },
+        })
+        .catch(() => {}),
     ]);
 
     return {

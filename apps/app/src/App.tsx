@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   ArrowsClockwise,
   Brain,
@@ -17,7 +17,6 @@ import {
   WifiSlash,
 } from '@phosphor-icons/react';
 import { LANGUAGES, type LanguageCode, type Lesson } from '@naidioma/shared';
-import { AdminConsole } from './components/AdminConsole';
 import { AlphabetView } from './components/AlphabetView';
 import { AuthScreen } from './components/AuthScreen';
 import { BillingModal } from './components/BillingModal';
@@ -55,12 +54,25 @@ import {
   playTapSound,
   setSoundEnabled,
 } from './lib/sound';
+import {
+  setTelemetryContext,
+  startTelemetrySession,
+  trackTelemetryEvent,
+} from './lib/telemetry';
+
+const AdminDashboard = lazy(() => import('./components/dashboard/AdminDashboard'));
 
 type MainTab = 'learn' | 'alphabet' | 'conversation' | 'review' | 'profile';
 
 const LANGUAGE_ORDER: LanguageCode[] = ['ko', 'en', 'ja', 'es', 'fr', 'de', 'it', 'zh'];
 
+function isDashboardPath(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname === '/dashboard' || window.location.pathname.startsWith('/dashboard/');
+}
+
 export function App() {
+  const [onDashboardRoute, setOnDashboardRoute] = useState<boolean>(() => isDashboardPath());
   const [booting, setBooting] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [tab, setTab] = useState<MainTab>('learn');
@@ -72,7 +84,6 @@ export function App() {
   const [justCompletedLessonId, setJustCompletedLessonId] = useState<string | null>(null);
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [billing, setBilling] = useState<BillingStatusResponse | null>(null);
   const [billingModalOpen, setBillingModalOpen] = useState(false);
   const [versionInfo, setVersionInfo] = useState<AppVersionResponse | null>(null);
@@ -85,8 +96,26 @@ export function App() {
   const pwaInstall = usePwaInstall();
 
   useEffect(() => {
+    const syncRoute = () => setOnDashboardRoute(isDashboardPath());
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
+
+  useEffect(() => {
     applyCalmMode(calmMode);
   }, [calmMode]);
+
+  // Keep client telemetry synced with current screen, language and sensory toggles
+  useEffect(() => {
+    if (onDashboardRoute) return;
+    setTelemetryContext({
+      screen: !user ? 'auth' : activeLesson ? 'lesson' : tab,
+      language: user?.activeLanguage,
+      pwaInstalled: pwaInstall.isStandalone,
+      calmModeEnabled: calmMode,
+      soundEnabled: soundOn,
+    });
+  }, [onDashboardRoute, user, activeLesson, tab, pwaInstall.isStandalone, calmMode, soundOn]);
 
   const loadCourseAndMeta = useCallback(async (lang: LanguageCode) => {
     setLoadingCourse(true);
@@ -126,13 +155,19 @@ export function App() {
   }, [loadCourseAndMeta, user]);
 
   useEffect(() => {
+    if (onDashboardRoute) {
+      setBooting(false);
+      return;
+    }
     void initNativeChrome();
     async function bootstrap() {
+      let bootedLang: LanguageCode | undefined;
       try {
         const token = await getAuthToken();
         if (token) {
           const res = await api.getMe();
           setUser(res.user);
+          bootedLang = res.user.activeLanguage;
           await loadCourseAndMeta(res.user.activeLanguage);
           if (navigator.onLine) {
             void syncOfflineQueueNow();
@@ -144,13 +179,18 @@ export function App() {
         }
       } finally {
         setBooting(false);
+        void startTelemetrySession({
+          language: bootedLang,
+          screen: bootedLang ? 'learn' : 'auth',
+        });
       }
     }
     void bootstrap();
-  }, [loadCourseAndMeta]);
+  }, [loadCourseAndMeta, onDashboardRoute]);
 
   async function handleAuthenticated(loggedUser: UserProfile) {
     setUser(loggedUser);
+    void startTelemetrySession({ language: loggedUser.activeLanguage, screen: 'learn' });
     await loadCourseAndMeta(loggedUser.activeLanguage);
   }
 
@@ -159,6 +199,7 @@ export function App() {
     if (!user || user.activeLanguage === lang) return;
     playTapSound();
     setUser({ ...user, activeLanguage: lang });
+    trackTelemetryEvent('language_switched', { language: lang, screen: tab });
     await api.updatePreferences({ activeLanguage: lang }).catch(() => {});
     await loadCourseAndMeta(lang);
   }
@@ -168,7 +209,6 @@ export function App() {
     setUser(null);
     setCourseDetail(null);
     setActiveLesson(null);
-    setAdminOpen(false);
   }
 
   function toggleSound() {
@@ -183,6 +223,7 @@ export function App() {
     setCalmMode(next);
     applyCalmMode(next);
     playTapSound();
+    trackTelemetryEvent('calm_mode_toggled', { meta: { enabled: next } });
   }
 
   function handleSavePet(next: PetProfile) {
@@ -196,6 +237,21 @@ export function App() {
   const handleClearJustCompleted = useCallback(() => {
     setJustCompletedLessonId(null);
   }, []);
+
+  // ROTA EXCLUSIVA DO ADMINISTRADOR (/dashboard) — 100% isolada dos alunos
+  if (onDashboardRoute) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-[100dvh] bg-[#FFFBF5] text-[#1E1A1D] flex items-center justify-center p-6 font-mono-code text-xs">
+            Carregando /dashboard...
+          </div>
+        }
+      >
+        <AdminDashboard />
+      </Suspense>
+    );
+  }
 
   // SPLASH DE ABERTURA COM O MASCOTE QUEBRA-CABEÇA PUZ (No lugar da coruja!)
   if (booting) {
@@ -263,7 +319,7 @@ export function App() {
           <nav className="space-y-2" aria-label="Navegação principal">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = !adminOpen && !activeLesson && tab === item.id;
+              const active = !activeLesson && tab === item.id;
               return (
                 <button
                   key={item.id}
@@ -271,7 +327,6 @@ export function App() {
                   onClick={() => {
                     void hapticTap();
                     playTapSound();
-                    setAdminOpen(false);
                     setActiveLesson(null);
                     setTab(item.id);
                   }}
@@ -367,7 +422,7 @@ export function App() {
         )}
 
         {/* BARRA SUPERIOR HUD ESTILO DUOLINGO (Bandeira + Ofensiva + Peças XP + Energia ∞) */}
-        {!activeLesson && !adminOpen && (
+        {!activeLesson && (
           <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b-2 border-[var(--na-border)] px-3 sm:px-5 h-16 flex items-center justify-between gap-2 safe-top">
             {/* Botão seletor de bandeira / idioma */}
             <div className="relative">
@@ -518,19 +573,24 @@ export function App() {
         )}
 
         <main className="flex-1 w-full mx-auto px-4 sm:px-6 pt-5 pb-28 md:pb-10">
-          {adminOpen ? (
-            <AdminConsole
-              onBack={() => setAdminOpen(false)}
-              onConfigChanged={() => void loadCourseAndMeta(user.activeLanguage)}
-            />
-          ) : activeLesson ? (
+          {activeLesson ? (
             <LessonPlayer
               language={user.activeLanguage}
               lesson={activeLesson}
               unit={courseDetail?.course.units.find((u) => u.id === activeLesson.unitId)}
               pet={pet}
               onPetHappinessChange={handlePetHappinessChange}
-              onExit={() => setActiveLesson(null)}
+              onExit={() => {
+                if (activeLesson && activeLesson.id !== justCompletedLessonId) {
+                  trackTelemetryEvent('lesson_abandoned', {
+                    language: user.activeLanguage,
+                    cefr: activeLesson.cefr,
+                    lessonId: activeLesson.id,
+                    screen: 'lesson',
+                  });
+                }
+                setActiveLesson(null);
+              }}
               onCompleted={(summary) => {
                 setJustCompletedLessonId(summary.lessonId);
                 setUser((prev) =>
@@ -553,7 +613,15 @@ export function App() {
                   courseDetail={courseDetail}
                   loading={loadingCourse}
                   onSelectLanguage={(lang) => void handleSelectLanguage(lang)}
-                  onStartLesson={(lesson) => setActiveLesson(lesson)}
+                  onStartLesson={(lesson) => {
+                    trackTelemetryEvent('lesson_started', {
+                      language: user.activeLanguage,
+                      cefr: lesson.cefr,
+                      lessonId: lesson.id,
+                      screen: 'lesson',
+                    });
+                    setActiveLesson(lesson);
+                  }}
                   onGoToAlphabet={() => setTab('alphabet')}
                   onGoToConversation={() => setTab('conversation')}
                   onGoToReview={() => setTab('review')}
@@ -583,7 +651,6 @@ export function App() {
                   billing={billing}
                   onUserUpdated={setUser}
                   onOpenBilling={() => setBillingModalOpen(true)}
-                  onOpenAdmin={() => setAdminOpen(true)}
                   onLogout={() => void handleLogout()}
                 />
               )}
@@ -592,7 +659,7 @@ export function App() {
         </main>
 
         {/* BARRA INFERIOR MOBILE ESTILO DUOLINGO (5 abas com ícones grandes coloridos) */}
-        {!activeLesson && !adminOpen && (
+        {!activeLesson && (
           <nav
             aria-label="Menu inferior"
             className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t-2 border-[var(--na-border)] grid grid-cols-5 px-1.5 pt-1.5 safe-bottom"

@@ -2,11 +2,14 @@ node_modules/
 dist/
 build/
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
+*.sqlite3
 coverage/
 .DS_Store
 apps/app/ios/App/Pods/

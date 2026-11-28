@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { config } from '../lib/config.js';
 import { BRAND_SLOGAN_EN, BRAND_SLOGAN_PT } from '../services/email.js';
+import { trackSeoPageVisit } from './telemetry.js';
 
 const LAST_MODIFIED = '2026-11-27';
 
@@ -977,45 +978,58 @@ function buildRobotsTxt(): string {
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /dashboard
 
 User-agent: Googlebot
 Allow: /
 Disallow: /api/
+Disallow: /dashboard
 
 User-agent: Google-Extended
 Allow: /
+Disallow: /dashboard
 
 User-agent: Bingbot
 Allow: /
 Disallow: /api/
+Disallow: /dashboard
 
 User-agent: Applebot
 Allow: /
 Disallow: /api/
+Disallow: /dashboard
 
 User-agent: GPTBot
 Allow: /
+Disallow: /dashboard
 
 User-agent: OAI-SearchBot
 Allow: /
+Disallow: /dashboard
 
 User-agent: ChatGPT-User
 Allow: /
+Disallow: /dashboard
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /dashboard
 
 User-agent: Claude-Web
 Allow: /
+Disallow: /dashboard
 
 User-agent: anthropic-ai
 Allow: /
+Disallow: /dashboard
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /dashboard
 
 User-agent: Meta-ExternalAgent
 Allow: /
+Disallow: /dashboard
 
 Sitemap: ${origin}/sitemap.xml
 # GEO AI Knowledge Manifest: ${origin}/llms.txt
@@ -1056,7 +1070,10 @@ export async function registerSeoRoutes(app: FastifyInstance) {
     const html = renderRegionalHtml(spec);
 
     // Canonical trailing-slash route
-    app.get(`/${spec.slug}/`, async (_req, reply) => {
+    app.get(`/${spec.slug}/`, async (req, reply) => {
+      if (process.env.NODE_ENV !== 'test') {
+        void trackSeoPageVisit(req, spec.slug);
+      }
       return reply
         .header('Content-Type', 'text/html; charset=utf-8')
         .header('Cache-Control', 'public, max-age=3600')
